@@ -26,7 +26,7 @@ final class Library: ObservableObject {
 
     func canPlay(_ game: CatalogGame) -> Bool { installed.contains(game.titleID) }
 
-    static func rebuildMessage(_ game: CatalogGame) -> String { "Rebuild \(game.name) in TVPort to play it from SwitchTV" }
+    static func rebuildMessage(_ game: CatalogGame) -> String { "\(game.name) cannot be opened from SwitchTV yet: its app is not installed, or was built without the switchtv link (see the README)" }
 
     /// Re-reads what changes while SwitchTV is away: which game apps exist and what the games recorded. canOpenURL is true only for an installed game that declares its switchtv-<title ID> scheme (listed in LSApplicationQueriesSchemes).
     func refresh() {
@@ -46,7 +46,7 @@ final class Library: ObservableObject {
         UIApplication.shared.open(url) { [weak self] opened in
             Task { @MainActor in
                 guard let self else { return }
-                if opened { self.markPlayed(game) } else { self.notice = "\(game.name) could not be opened. Rebuild it in TVPort and try again." }
+                if opened { self.markPlayed(game) } else { self.notice = "\(game.name) could not be opened. Install its app again and try again." }
             }
         }
     }

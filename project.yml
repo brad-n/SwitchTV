@@ -1,9 +1,9 @@
-# SwitchTV: the launcher app that lists the games TVPort built and opens them (tvport/backend.py `switchtv build` makes a copy of this folder,
-# adds Catalog/ + Generated/ and replaces the ${SWITCHTV_*} values and the empty LSApplicationQueriesSchemes list, then runs xcodegen on it).
+# SwitchTV: the launcher app that lists the games you built and opens them. `switchtv.py build` makes a copy of this folder's app files in its cache folder,
+# adds Catalog/ + Generated/ and replaces the ${SWITCHTV_*} values and the empty LSApplicationQueriesSchemes list, then runs xcodegen on the copy.
 # Two targets: the app, and its Top Shelf extension (TopShelf/). Both carry the catalogue and the keychain access group (recently played is shared through it).
 name: SwitchTV
 options:
-  bundleIdPrefix: dev.tvport
+  bundleIdPrefix: ${SWITCHTV_PREFIX}
   deploymentTarget:
     tvOS: "17.0"
 targets:

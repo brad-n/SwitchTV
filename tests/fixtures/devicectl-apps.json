@@ -1,0 +1,20 @@
+{
+  "info": {
+    "arguments": ["devicectl", "device", "info", "apps", "--device", "Living Room", "--json-output", "apps.json"],
+    "commandType": "devicectl.device.info.apps",
+    "environment": {"TERM": "xterm-256color"},
+    "outcome": "success",
+    "version": "400.0.0"
+  },
+  "result": {
+    "apps": [
+      {"appClip": false, "builtByDeveloper": true, "bundleIdentifier": "dev.tvport.abcde12345.g0100152000022000", "bundleVersion": "1", "defaultApp": false, "hidden": false, "internalApp": false, "name": "Mario Kart 8 Deluxe", "removable": true, "url": "file:///private/var/containers/Bundle/Application/AAAA/Mario%20Kart.app/", "version": "1.0"},
+      {"appClip": false, "builtByDeveloper": true, "bundleIdentifier": "dev.tvport.abcde12345.g010015100b514000", "bundleVersion": "1", "defaultApp": false, "hidden": false, "internalApp": false, "name": "Wonder", "removable": true, "url": "file:///private/var/containers/Bundle/Application/BBBB/Wonder.app/", "version": "1.0"},
+      {"appClip": false, "builtByDeveloper": true, "bundleIdentifier": "dev.tvport.abcde12345.switchtv", "bundleVersion": "1730000000", "defaultApp": false, "hidden": false, "internalApp": false, "name": "SwitchTV", "removable": true, "url": "file:///private/var/containers/Bundle/Application/CCCC/SwitchTV.app/", "version": "1.0"},
+      {"appClip": false, "builtByDeveloper": false, "bundleIdentifier": "com.apple.TVSettings", "bundleVersion": "1", "defaultApp": true, "hidden": false, "internalApp": false, "name": "Settings", "removable": false, "url": "file:///Applications/TVSettings.app/", "version": "26.0"},
+      {"appClip": false, "builtByDeveloper": true, "bundleIdentifier": "com.example.someotherapp", "bundleVersion": "3", "defaultApp": false, "hidden": false, "internalApp": false, "name": "Not a game", "removable": true, "url": "file:///private/var/containers/Bundle/Application/DDDD/Other.app/", "version": "3.1"}
+    ],
+    "deviceIdentifier": "00000000-0000-0000-0000-000000000000",
+    "outcome": "success"
+  }
+}

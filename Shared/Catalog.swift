@@ -1,5 +1,5 @@
 // The games SwitchTV lists: Catalog/catalog.json and its images, written by `backend.py switchtv build` into the app and into its Top Shelf extension. Nothing is fetched at run time except screenshots.
-// Foundation only: SwitchTV, the Top Shelf extension and the command-line checks (tvport/tests/test_switchtv_app.py) all compile this file.
+// Foundation only: SwitchTV, the Top Shelf extension and the command-line checks (tests/test_shared_code.py) all compile this file.
 import Foundation
 
 struct CatalogGame: Codable, Identifiable, Hashable {

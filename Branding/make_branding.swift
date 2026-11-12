@@ -1,6 +1,6 @@
 // SwitchTV branding from the one source logo (switchtv-icon-source.png: the split-apple mark above the wordmark, on white).
 // Usage: make_branding.swift <source.png> <out dir>
-//   writes <out>/icon-art.png   the mark alone, centred on the logo's own white, 16:10 (the input of dm/ios/tools/tv_icon.swift for the App Icon)
+//   writes <out>/icon-art.png   the mark alone, centred on the logo's own white, 16:10 (the input of tools/tv_icon.swift for the App Icon)
 //          <out>/shelf-art.png  the whole logo, centred on the logo's own white with margins, 8:3 (the Top Shelf images)
 //          <out>/colors.txt     the sampled red / black / paper colour, as hex (paper = DM_ICON_BACKDROP for tv_icon.swift) (Theme.swift keeps these)
 // The mark's rectangle is measured on the 1254x1254 source. A new logo at another size: change `markRect`.

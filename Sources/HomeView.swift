@@ -38,7 +38,7 @@ private struct EmptyCatalog: View {
     var body: some View {
         VStack(spacing: 16) {
             Text("No games yet").font(.largeTitle.bold()).foregroundStyle(Theme.textPrimary)
-            Text("Build a game in TVPort, then install SwitchTV again.").foregroundStyle(Theme.textSecondary)
+            Text("Add games with switchtv.py, then install SwitchTV again.").foregroundStyle(Theme.textSecondary)
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

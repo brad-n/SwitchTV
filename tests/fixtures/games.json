@@ -1,0 +1,7 @@
+{
+  "games": [
+    {"titleID": "0100152000022000", "name": "Mario Kart 8 Deluxe", "bundleID": "dev.tvport.abcde12345.g0100152000022000", "artwork": "kart.jpg"},
+    {"titleID": "010015100b514000", "name": "Super Mario Bros. Wonder", "artworkSource": "https://img-eshop.cdn.nintendo.net/i/game.jpg"},
+    {"titleID": "not-a-title-id", "name": "Broken entry"}
+  ]
+}

@@ -1,7 +1,7 @@
 // What SwitchTV, its Top Shelf extension and the game apps share: a few small items in a shared keychain access group (<team>.dev.tvport.switchtv, named by SwitchTVGroup in each Info.plist; every app
 // that uses it lists it under keychain-access-groups). One generic-password item per record, service "dev.tvport.switchtv", so two apps never rewrite each other's records:
 //   account <TITLE ID IN CAPITALS>   the Unix time (seconds, as text) the game was last played; SwitchTV writes it when it opens a game, and a game app writes its own when it comes to the front
-//                                    (dm/ios/SourcesTV/TVLastPlayed.m: keep the two in step).
+//                                    (README, "What a game build needs"; TVPort's dm/ios/SourcesTV/TVLastPlayed.m is one implementation: keep them in step).
 //   account launchable               JSON array of the title IDs whose app answers its URL scheme, written by SwitchTV (an extension cannot ask canOpenURL).
 // Why the keychain and not an App Group: an App Group needs an App ID registered in the developer account, which Xcode can only do with an Apple ID signed in; the keychain group works under the
 // team's wildcard profile (L9492K5865.*) that automatic signing already has. tvOS keeps the keychain (it purges app files). Without the entitlement every call fails quietly and the store is empty.
