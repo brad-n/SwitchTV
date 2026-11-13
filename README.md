@@ -1,5 +1,7 @@
 # SwitchTV
 
+What changed in each release: [CHANGELOG.md](CHANGELOG.md) and [Releases](https://github.com/brad-n/SwitchTV/releases).
+
 SwitchTV is an Apple TV app that lists the Nintendo Switch games you have built for your Apple TV, with their box art, and opens them. It has a big banner for the game you are on, a Recently Played row, All Games, a row for each genre, a details page for each game (description, publisher, release date, players, screenshots), and a Top Shelf on the Apple TV home screen.
 
 ![The home screen: Recently Played and All Games, with the game in focus across the top](docs/screenshots/home.jpg)
