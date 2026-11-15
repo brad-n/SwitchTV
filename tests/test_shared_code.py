@@ -91,7 +91,7 @@ func game(_ id: String, _ name: String, genres: [String] = [], card: String = ""
          {"env":"DM_FOLIAGE","kind":"toggle","label":"Grass and ground cover","default":"on","on":"on","off":"off","group":"Game options","help":"g"},
          {"env":"DM_ANISO","kind":"choice","label":"Anisotropic filtering","default":"0","options":[["0","Auto"],["16","16x"]],"group":"Picture"},
          {"env":"DM_RUMBLE_GAIN","kind":"range","label":"Rumble strength","default":"1.0","min":0,"max":3,"step":0.1,"group":"Controls","needs":"DM_RUMBLE=1"},
-         {"env":"DM_OPMODE","kind":"choice","label":"Console mode","default":"1","options":[["1","Docked"],["0","Handheld"]],"group":"Picture","fixed":"0"}]
+         {"env":"DM_OPMODE","kind":"choice","label":"Console mode","default":"0","options":[["1","Docked"],["0","Handheld"]],"group":"Picture","setByBuild":true}]
         """
         let rows = try JSONDecoder().decode([GameSetting].self, from: Data(rowsJSON.utf8))
         let (scale, grass, aniso, gain, opmode) = (rows[0], rows[1], rows[2], rows[3], rows[4])
@@ -100,7 +100,7 @@ func game(_ id: String, _ name: String, genres: [String] = [], card: String = ""
         assert(scale.isDefault("1.00") && !scale.isDefault("0.95") && scale.accepts("0.75") && !scale.accepts("0.25") && !scale.accepts("0x1") && !scale.accepts("nan"))
         assert(scale.text("0.50") == "960 \u{d7} 540 (50 %)" && scale.text("0.50", docked: false) == "640 \u{d7} 360 (50 %)" && gain.text("1.50") == "150 %")
         assert(grass.values == ["on", "off"] && grass.text("off") == "Off" && grass.text("on") == "On" && grass.accepts("off") && !grass.accepts("0"))
-        assert(aniso.text("16") == "16x" && !aniso.accepts("8") && aniso.parent == nil && opmode.fixed == "0" && scale.fixed == nil)
+        assert(aniso.text("16") == "16x" && !aniso.accepts("8") && aniso.parent == nil && opmode.fromBuild && !scale.fromBuild && opmode.isDefault("0"))
 
         let optionsRoot = root.appendingPathComponent("Options")
         let options = OptionsStore(backing: FolderBacking(root: optionsRoot))
@@ -110,6 +110,8 @@ func game(_ id: String, _ name: String, genres: [String] = [], card: String = ""
         assert(!options.choose(ocarina, aniso, "8") && !options.choose("not-a-title-id", grass, "off"))   // a value the game does not offer; not a game
         assert(options.choices(ocarina) == ["DM_RENDER_SCALE": "0.50", "DM_FOLIAGE": "off", "DM_ANISO": "16"])
         assert(options.choose(ocarina, aniso, "0") && options.choose(ocarina, scale, "1.00"))           // back to the default: forgotten, so the game's next defaults apply
+        assert(options.choose(ocarina, opmode, "1") && options.choices(ocarina)["DM_OPMODE"] == "1")    // the build chose handheld: docked is kept, and the game takes it over its dm/env.txt
+        assert(options.choose(ocarina, opmode, "0"))                                                    // back to the build's value: forgotten, so the build's dm/env.txt applies
         assert(options.choices("0400486024dec000") == ["DM_FOLIAGE": "off"])                            // any letter case
         // the item the game app reads at boot (TVPort's SourcesTV/TVOptions.m): account = the title ID in capitals, value = a JSON object of strings
         let item = try JSONSerialization.jsonObject(with: Data(contentsOf: optionsRoot.appendingPathComponent(ocarina))) as! [String: Any]

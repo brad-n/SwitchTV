@@ -6,7 +6,7 @@ What changes in each release, in plain terms. Releases are tagged `v<version>` a
 
 **Game options**
 - An Options button beside Play on a game's details page: the game's settings (picture, performance, the game's own options such as Ocarina of Time's grass, ground mist, reflections, model detail and sun shadows, controls, language), changed with the remote. Each choice is kept at once and the game takes it the next time it starts; Reset to Defaults forgets them.
-- Settings the game's build fixes show with a lock: the game takes the build's value.
+- A setting TVPort chose when it built the game (Console mode, for one) starts at TVPort's value, shown as its default; a choice on the TV wins over it, and Reset goes back to it.
 - The settings come from the game app's own list (`dm/launcher.json`), read from built apps or named in the games file. Games built by the TVPort fork pick the choices up; the README describes the format for other builds.
 
 ## 0.1.0 (2026-11-13)

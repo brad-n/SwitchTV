@@ -55,7 +55,7 @@ class Fixture(unittest.TestCase):
 
 class OptionsTests(Fixture):
     """The catalogue carries each game's Options page: its settings list (Ocarina of Time's, as TVPort writes it into the app) less what an Apple TV cannot use, grouped, with help, and the rows the
-    app's own env.txt sets marked fixed."""
+    app's own env.txt sets taking the build's value as their default."""
     LIST = json.loads((ROOT / 'tests/fixtures/ocarina-launcher.json').read_text())['settings']
 
     def test_the_settings_rows_go_into_the_catalogue_grouped_for_the_tv(self):
@@ -73,8 +73,9 @@ class OptionsTests(Fixture):
         self.assertEqual(rows['DM_FPS_TARGET']['group'], 'Performance')
         self.assertTrue(all(s['help'] for s in kart['settings']))   # every row has a line of help: the list's note, else SwitchTV's own
         self.assertIn('haze', rows['DM_GROUND_MIST']['help'])
-        self.assertEqual(rows['DM_OPMODE']['fixed'], '0')   # set by the app's env.txt
-        self.assertEqual([e for e, s in rows.items() if 'fixed' in s], ['DM_OPMODE'])
+        self.assertEqual((rows['DM_OPMODE']['default'], rows['DM_OPMODE']['setByBuild']), ('0', True))   # the app's env.txt: the game starts handheld unless the page says otherwise
+        self.assertEqual([e for e, s in rows.items() if s.get('setByBuild')], ['DM_OPMODE'])
+        self.assertEqual(rows['DM_OPMODE']['options'], [['1', 'Docked'], ['0', 'Handheld']])   # and the player can still pick either
         self.assertEqual((rows['DM_FOLIAGE']['default'], rows['DM_FOLIAGE']['on'], rows['DM_FOLIAGE']['off']), ('on', 'on', 'off'))
         self.assertEqual((rows['DM_RENDER_SCALE']['min'], rows['DM_RENDER_SCALE']['max'], rows['DM_RENDER_SCALE']['step']), (0.5, 1.0, 0.05))
         self.assertNotIn('section', rows['DM_FOLIAGE'])   # the group replaces it

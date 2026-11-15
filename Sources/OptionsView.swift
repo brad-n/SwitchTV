@@ -17,8 +17,8 @@ final class OptionsModel: ObservableObject {
         self.game = game
         self.store = store
         let saved = store?.choices(game.titleID) ?? [:]
-        for setting in game.options {   // the build's value where its env.txt sets one; else the saved choice, unless the game no longer offers it; else the default
-            values[setting.env] = setting.fixed ?? saved[setting.env].flatMap { setting.accepts($0) ? $0 : nil } ?? setting.def
+        for setting in game.options {   // the saved choice, unless the game no longer offers it; else the default (the build's value, where its dm/env.txt sets one)
+            values[setting.env] = saved[setting.env].flatMap { setting.accepts($0) ? $0 : nil } ?? setting.def
         }
         if store == nil { notice = Self.noGroup }
     }
@@ -42,10 +42,10 @@ final class OptionsModel: ObservableObject {
         return order.map { ($0, rows[$0]!) }
     }
 
-    var changed: Bool { game.options.contains { $0.fixed == nil && !$0.isDefault(value($0)) } }
+    var changed: Bool { game.options.contains { !$0.isDefault(value($0)) } }
 
     func set(_ setting: GameSetting, _ value: String) {
-        guard setting.fixed == nil, setting.accepts(value) else { return }
+        guard setting.accepts(value) else { return }
         values[setting.env] = value
         guard let store else { print("SwitchTV options: \(game.titleID) \(setting.env)=\(value) not kept: no keychain group"); return }
         if store.choose(game.titleID, setting, value) {
@@ -57,7 +57,7 @@ final class OptionsModel: ObservableObject {
     }
 
     func reset() {
-        for setting in game.options where setting.fixed == nil { values[setting.env] = setting.def }
+        for setting in game.options { values[setting.env] = setting.def }
         guard let store else { return }
         if store.reset(game.titleID) { print("SwitchTV options: \(game.titleID) reset to its defaults"); notice = nil }
         else { notice = "The choices could not be forgotten: the keychain refused. The game keeps its earlier settings." }
@@ -117,11 +117,7 @@ struct OptionsView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(setting.label).font(.headline).foregroundStyle(Theme.textPrimary)
                     if let help = setting.help, !help.isEmpty { Text(help).font(.callout).foregroundStyle(Theme.textSecondary).fixedSize(horizontal: false, vertical: true) }
-                    if setting.fixed != nil {
-                        Text("Set by the game\u{2019}s build, which the game takes over a choice here. Change it in TVPort and build the game again.").font(.callout).foregroundStyle(Theme.textTertiary).fixedSize(horizontal: false, vertical: true)
-                    } else {
-                        Text("Default: \(model.text(setting, setting.def))").font(.callout).foregroundStyle(Theme.textTertiary)
-                    }
+                    Text(defaultLine(setting)).font(.callout).foregroundStyle(Theme.textTertiary).fixedSize(horizontal: false, vertical: true)
                 }
             } else if focused == Self.reset {
                 Text("Sets every option back to the game\u{2019}s defaults, the ones it was tested with.").font(.callout).foregroundStyle(Theme.textSecondary)
@@ -136,12 +132,14 @@ struct OptionsView: View {
         .frame(maxHeight: 900, alignment: .topLeading)
     }
 
+    /// "Default: Docked", or for a setting TVPort chose when it built the game "Set by TVPort: Handheld" (the game starts with it unless a choice here says otherwise).
+    private func defaultLine(_ setting: GameSetting) -> String {
+        setting.fromBuild ? "Set by TVPort: \(model.text(setting, setting.def)). A choice here wins over it; Reset goes back to it." : "Default: \(model.text(setting, setting.def))"
+    }
+
     @ViewBuilder private func row(_ setting: GameSetting) -> some View {
         let value = model.value(setting)
-        if setting.fixed != nil {   // focusable, so its line on the left can say why it does not change
-            Button {} label: { OptionRow(label: setting.label, value: model.text(setting), changed: false, locked: true) }
-                .focused($focused, equals: setting.env)
-        } else if setting.kind == "toggle" {
+        if setting.kind == "toggle" {
             Button { model.set(setting, value == setting.onValue ? setting.offValue : setting.onValue) } label: {
                 OptionRow(label: setting.label, value: model.text(setting), changed: !setting.isDefault(value))
             }
@@ -155,18 +153,16 @@ struct OptionsView: View {
     }
 }
 
-/// A row: the setting's name, and its value on the right (in the accent colour when it is not the default; with a lock when the game's build sets it).
+/// A row: the setting's name, and its value on the right (in the accent colour when it is not the default).
 private struct OptionRow: View {
     let label: String
     let value: String
     let changed: Bool
-    var locked = false
     @Environment(\.isFocused) private var isFocused
     var body: some View {
         HStack {
             Text(label)
             Spacer(minLength: 30)
-            if locked { Image(systemName: "lock.fill").font(.callout).foregroundStyle(.secondary) }
             Text(value).foregroundStyle(changed && !isFocused ? Theme.accent : .secondary).lineLimit(1)
         }
     }
@@ -185,14 +181,14 @@ private struct OptionValues: View {
                 VStack(alignment: .leading, spacing: 18) {
                     Text(setting.label).font(.title2.weight(.bold)).foregroundStyle(Theme.textPrimary)
                     if let help = setting.help, !help.isEmpty { Text(help).font(.callout).foregroundStyle(Theme.textSecondary).fixedSize(horizontal: false, vertical: true) }
-                    Text("Default: \(model.text(setting, setting.def))").font(.callout).foregroundStyle(Theme.textTertiary)
+                    Text(setting.fromBuild ? "Set by TVPort: \(model.text(setting, setting.def))" : "Default: \(model.text(setting, setting.def))").font(.callout).foregroundStyle(Theme.textTertiary)
                 }
                 .frame(width: 560, alignment: .topLeading)
                 List {
                     ForEach(setting.values, id: \.self) { value in
                         Button { model.set(setting, value); dismiss() } label: {
                             HStack {
-                                Text(model.text(setting, value) + (setting.isDefault(value) ? "  (default)" : ""))
+                                Text(model.text(setting, value) + (setting.isDefault(value) ? (setting.fromBuild ? "  (set by TVPort)" : "  (default)") : ""))
                                 Spacer()
                                 if model.value(setting) == value || (setting.kind == "range" && Double(model.value(setting)).map { abs($0 - (Double(value) ?? .nan)) < 1e-6 } == true) {
                                     Image(systemName: "checkmark")

@@ -110,7 +110,8 @@ def well_formed(row: dict) -> bool:
 
 def tv_settings(rows, build_env: Optional[dict] = None) -> list:
     """The rows of a game's Options page, from its settings list: those an Apple TV can use, grouped (GROUPS first, in their order; rows keep their order within a group), each with its help line.
-    build_env: what the app's dm/env.txt sets; a row it sets is `fixed` at that value (the game takes it over a choice, as its launcher would show a row an env file sets)."""
+    build_env: what the app's dm/env.txt sets (TVPort's build choices). Without a choice the game starts with those values, so a row it sets takes the build's value as its default (`setByBuild`):
+    the page shows it as the default and Reset goes back to it; a choice made on the page wins over it (the game applies SwitchTV's choices before its dm/env.txt)."""
     out, first = [], {}
     for row in rows or []:
         if not isinstance(row, dict) or row.get('env') in NOT_ON_TV or not well_formed(row):
@@ -119,7 +120,7 @@ def tv_settings(rows, build_env: Optional[dict] = None) -> list:
         setting['group'] = GROUP_OF.get(row['env']) or SECTION_GROUP.get(row.get('section')) or str(row.get('section') or 'Game')
         setting['help'] = row.get('note') or HELP.get(row['env'], '')
         if build_env and isinstance(build_env.get(row['env']), str):
-            setting['fixed'] = build_env[row['env']]
+            setting['default'], setting['setByBuild'] = build_env[row['env']], True
         first.setdefault(setting['group'], len(first))
         out.append(setting)
     rank = {group: GROUPS.index(group) if group in GROUPS else len(GROUPS) + first[group] for group in first}

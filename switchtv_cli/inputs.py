@@ -9,8 +9,8 @@ A game is told apart by its 16-digit Switch title ID. An app carries it as its U
 `opens` says whether the app declares the switchtv-<title ID> URL scheme (True/False), or is None when that cannot be known (devicectl does not report URL schemes).
 `settings` is the game app's own settings list, the rows of its Options page (catalog.tv_settings): a TVPort app carries it as dm/launcher.json (TVPort's dm/games/settings.py writes it; docs/frontends.md
 there describes the rows), and a games file names that file (or gives the rows). devicectl cannot read an app's files, so games found only on the Apple TV have none.
-`buildEnv` is what the app's own dm/env.txt sets (KEY: value; TVPort writes the build's choices there, Console mode among them): the game takes those over a choice made in SwitchTV, so its Options
-page shows them as set by the build.
+`buildEnv` is what the app's own dm/env.txt sets (KEY: value; TVPort writes the build's choices there, Console mode among them): the game starts with those unless a choice made in SwitchTV says
+otherwise, so its Options page shows them as the defaults.
 """
 from __future__ import annotations
 

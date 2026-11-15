@@ -63,14 +63,15 @@ struct GameSetting: Codable, Hashable, Identifiable {
     let on, off: String?         // toggle: the values the variable takes (1 / 0 when not given)
     let needs: String?           // "<VAR>=<value>": shown only while that setting has that value
     let base: Base?              // render scale: the 3D picture's size at 1.0, docked and handheld
-    let fixed: String?           // the value the game app's own env.txt sets: the game takes it over a choice, so the page shows it and does not change it
+    let setByBuild: Bool?        // `def` is the value the game app's own dm/env.txt sets (TVPort's build choice), which the game starts with when nothing is chosen here
     struct Base: Codable, Hashable { let docked, handheld: [Int] }
 
     var id: String { env }
+    var fromBuild: Bool { setByBuild ?? false }
     var onValue: String { on ?? "1" }
     var offValue: String { off ?? "0" }
 
-    enum CodingKeys: String, CodingKey { case env, kind, label, def = "default", group, help, options, min, max, step, on, off, needs, base, fixed }
+    enum CodingKeys: String, CodingKey { case env, kind, label, def = "default", group, help, options, min, max, step, on, off, needs, base, setByBuild }
 
     /// A range compares as numbers (its steps are written with two decimals: 1.00 is the default 1.0).
     func isDefault(_ value: String) -> Bool {
