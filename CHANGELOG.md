@@ -4,6 +4,10 @@ What changes in each release, in plain terms. Releases are tagged `v<version>` a
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.2.0 (2026-11-15)
+
 **Game options**
 - An Options button beside Play on a game's details page: the game's settings (picture, performance, the game's own options such as Ocarina of Time's grass, ground mist, reflections, model detail and sun shadows, controls, language), changed with the remote. Each choice is kept at once and the game takes it the next time it starts; Reset to Defaults forgets them.
 - A setting TVPort chose when it built the game (Console mode, for one) starts at TVPort's value, shown as its default; a choice on the TV wins over it, and Reset goes back to it.
