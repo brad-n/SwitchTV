@@ -1,0 +1,466 @@
+{
+ "schema": 1,
+ "game": "0400486024DEC000",
+ "settings": [
+  {
+   "env": "DM_FPS_TARGET",
+   "kind": "choice",
+   "section": "Game",
+   "label": "Frame rate",
+   "note": "",
+   "default": "60",
+   "level": "basic",
+   "options": [
+    [
+     "30",
+     "30 fps"
+    ],
+    [
+     "60",
+     "60 fps"
+    ]
+   ]
+  },
+  {
+   "env": "DM_DYNAMIC_RESOLUTION",
+   "kind": "toggle",
+   "section": "Game",
+   "label": "Dynamic resolution",
+   "note": "Lets the game lower its resolution under load. Turn off to keep full resolution for the selected console mode.",
+   "default": "0",
+   "on": "1",
+   "off": "0"
+  },
+  {
+   "env": "DM_RENDER_SCALE",
+   "kind": "range",
+   "section": "Game",
+   "label": "Render scale",
+   "note": "",
+   "default": "1.0",
+   "level": "basic",
+   "min": 0.5,
+   "max": 1.0,
+   "step": 0.05
+  },
+  {
+   "env": "DM_ANISO",
+   "kind": "choice",
+   "section": "Game",
+   "label": "Anisotropic filtering",
+   "note": "Sharper textures on ground and walls seen at a shallow angle, for a small GPU cost. Auto keeps what the game asks for; a number is the least it gets, for textures that are filtered smoothly.",
+   "default": "0",
+   "options": [
+    [
+     "0",
+     "Auto"
+    ],
+    [
+     "2",
+     "2x"
+    ],
+    [
+     "4",
+     "4x"
+    ],
+    [
+     "8",
+     "8x"
+    ],
+    [
+     "16",
+     "16x"
+    ]
+   ]
+  },
+  {
+   "env": "DM_OPMODE",
+   "kind": "choice",
+   "section": "Game",
+   "label": "Console mode",
+   "note": "",
+   "default": "1",
+   "level": "basic",
+   "options": [
+    [
+     "1",
+     "Docked"
+    ],
+    [
+     "0",
+     "Handheld"
+    ]
+   ]
+  },
+  {
+   "env": "DM_PRESENT_UPSCALE",
+   "kind": "choice",
+   "section": "Game",
+   "label": "Upscaling",
+   "note": "Uses more GPU time and can increase heat.",
+   "default": "off",
+   "options": [
+    [
+     "off",
+     "Standard"
+    ],
+    [
+     "metalfx",
+     "MetalFX"
+    ]
+   ]
+  },
+  {
+   "env": "DM_UPSCALER",
+   "kind": "choice",
+   "section": "Game",
+   "label": "Game's upscaler",
+   "note": "Off (plain scale) turns the game's upscaling network off and stretches the game's own smaller picture with a plain bilinear scale: far less GPU time, a softer picture, and no MetalFX is used.",
+   "default": "game",
+   "options": [
+    [
+     "game",
+     "Game's own"
+    ],
+    [
+     "metalfx",
+     "MetalFX"
+    ],
+    [
+     "bilinear",
+     "Off (plain scale)"
+    ]
+   ]
+  },
+  {
+   "env": "DM_MOVIE_NETWORK",
+   "kind": "choice",
+   "section": "Game",
+   "label": "Movie enhancement",
+   "note": "The game runs its movies through a neural network. Plain picture skips it: far less GPU time, a movie without the enhancement.",
+   "default": "game",
+   "options": [
+    [
+     "game",
+     "Game's own"
+    ],
+    [
+     "bypass",
+     "Plain picture"
+    ]
+   ]
+  },
+  {
+   "env": "DM_LANG",
+   "kind": "choice",
+   "section": "Game",
+   "label": "Game language",
+   "note": "",
+   "default": "en-US",
+   "level": "basic",
+   "options": [
+    [
+     "en-US",
+     "American English"
+    ],
+    [
+     "en-GB",
+     "British English"
+    ],
+    [
+     "ja",
+     "Japanese"
+    ],
+    [
+     "fr",
+     "French"
+    ],
+    [
+     "de",
+     "German"
+    ],
+    [
+     "es-419",
+     "Latin American Spanish"
+    ],
+    [
+     "es",
+     "Spanish"
+    ],
+    [
+     "it",
+     "Italian"
+    ],
+    [
+     "nl",
+     "Dutch"
+    ],
+    [
+     "fr-CA",
+     "Canadian French"
+    ],
+    [
+     "pt",
+     "Portuguese"
+    ],
+    [
+     "ru",
+     "Russian"
+    ],
+    [
+     "ko",
+     "Korean"
+    ],
+    [
+     "zh-Hant",
+     "Traditional Chinese"
+    ],
+    [
+     "zh-Hans",
+     "Simplified Chinese"
+    ],
+    [
+     "pt-BR",
+     "Brazilian Portuguese"
+    ]
+   ]
+  },
+  {
+   "env": "DM_PICTURE_FIT",
+   "kind": "choice",
+   "section": "Game",
+   "label": "Picture",
+   "note": "Fill crops the game's 16:9 picture to cover the screen. Health bars, subtitles or maps near the edges can be cut off. A full-screen picture without cropping needs a patch for each game.",
+   "default": "fit",
+   "options": [
+    [
+     "fit",
+     "Fit"
+    ],
+    [
+     "fill",
+     "Fill"
+    ]
+   ]
+  },
+  {
+   "env": "DM_SHOW_FPS",
+   "kind": "toggle",
+   "section": "Game",
+   "label": "Frame-rate counter",
+   "note": "",
+   "default": "0",
+   "on": "1",
+   "off": "0"
+  },
+  {
+   "env": "DM_TOUCH_HAPTICS",
+   "kind": "toggle",
+   "section": "Controls",
+   "label": "Touch feedback",
+   "note": "",
+   "default": "1",
+   "on": "1",
+   "off": "0"
+  },
+  {
+   "env": "DM_RUMBLE",
+   "kind": "toggle",
+   "section": "Controls",
+   "label": "Game rumble",
+   "note": "",
+   "default": "1",
+   "level": "basic",
+   "on": "1",
+   "off": "0"
+  },
+  {
+   "env": "DM_RUMBLE_GAIN",
+   "kind": "range",
+   "section": "Controls",
+   "label": "Rumble strength",
+   "note": "",
+   "default": "1.0",
+   "needs": "DM_RUMBLE=1",
+   "min": 0.0,
+   "max": 3.0,
+   "step": 0.1
+  },
+  {
+   "env": "DM_RUMBLE_MIN",
+   "kind": "range",
+   "section": "Controls",
+   "label": "Rumble cutoff",
+   "note": "",
+   "default": "0",
+   "min": 0.0,
+   "max": 0.9,
+   "step": 0.05
+  },
+  {
+   "env": "DM_PAD_PRESS_TO_JOIN",
+   "kind": "toggle",
+   "section": "Controls",
+   "label": "Press a button to join",
+   "note": "",
+   "default": "0",
+   "on": "1",
+   "off": "0"
+  },
+  {
+   "env": "DM_PRESENT_SNAP",
+   "kind": "toggle",
+   "section": "Performance",
+   "label": "Frame buffering",
+   "note": "Up to one frame more display latency.",
+   "default": "0",
+   "on": "1",
+   "off": "0"
+  },
+  {
+   "env": "DM_PSO_MTL4",
+   "kind": "toggle",
+   "section": "Performance",
+   "label": "Metal 4 pipelines",
+   "note": "Keeps a pipeline archive; uses more memory.",
+   "default": "0",
+   "on": "1",
+   "off": "0"
+  },
+  {
+   "env": "DM_PSO_PREBUILD",
+   "kind": "toggle",
+   "section": "Performance",
+   "label": "Pipeline prebuild",
+   "note": "The first start waits a few minutes for it, once.",
+   "default": "1",
+   "needs": "DM_PSO_MTL4=1",
+   "on": "1",
+   "off": "0"
+  },
+  {
+   "env": "DM_NVN_ENC_THREAD",
+   "kind": "toggle",
+   "section": "Performance",
+   "label": "Encode thread",
+   "note": "",
+   "default": "1",
+   "on": "1",
+   "off": "0"
+  },
+  {
+   "env": "DM_FPS_HOLD",
+   "kind": "toggle",
+   "section": "Performance",
+   "label": "Hold frames when late",
+   "note": "",
+   "default": "on",
+   "on": "on",
+   "off": "off"
+  },
+  {
+   "env": "DM_METAL_HUD",
+   "kind": "toggle",
+   "section": "Performance",
+   "label": "Performance HUD",
+   "note": "",
+   "default": "0",
+   "on": "1",
+   "off": "0"
+  },
+  {
+   "env": "DM_FOLIAGE",
+   "kind": "toggle",
+   "section": "Game options",
+   "label": "Grass and ground cover",
+   "note": "Off draws no grass, ferns, clover, ivy or moss: much less GPU time and about 90 MB less graphics memory, with bare-looking ground.",
+   "default": "on",
+   "on": "on",
+   "off": "off"
+  },
+  {
+   "env": "DM_GROUND_MIST",
+   "kind": "toggle",
+   "section": "Game options",
+   "label": "Ground mist",
+   "note": "Off skips the soft haze over the ground: less GPU time, and misty places look clearer and darker.",
+   "default": "on",
+   "on": "on",
+   "off": "off"
+  },
+  {
+   "env": "DM_REFLECTION_INTERVAL",
+   "kind": "choice",
+   "section": "Game options",
+   "label": "Reflection updates",
+   "note": "Less often saves GPU time; reflections then catch up with a change of light or place later.",
+   "default": "1",
+   "options": [
+    [
+     "1",
+     "Every frame"
+    ],
+    [
+     "2",
+     "Every 2nd frame"
+    ],
+    [
+     "4",
+     "Every 4th frame"
+    ],
+    [
+     "8",
+     "Every 8th frame"
+    ]
+   ]
+  },
+  {
+   "env": "DM_MODEL_LOD",
+   "kind": "choice",
+   "section": "Game options",
+   "label": "Model detail",
+   "note": "Lower switches models to their simpler versions closer to the camera, for less GPU time.",
+   "default": "1",
+   "options": [
+    [
+     "1",
+     "Full"
+    ],
+    [
+     "2",
+     "Lower"
+    ],
+    [
+     "4",
+     "Low"
+    ],
+    [
+     "8",
+     "Lowest"
+    ]
+   ]
+  },
+  {
+   "env": "DM_SHADOW_CASCADES",
+   "kind": "choice",
+   "section": "Game options",
+   "label": "Sun shadows",
+   "note": "Fewer shadow cascades: shadows near the player are softer and fainter, for a little less GPU time.",
+   "default": "0",
+   "options": [
+    [
+     "0",
+     "Full"
+    ],
+    [
+     "2",
+     "Reduced"
+    ],
+    [
+     "1",
+     "Low"
+    ]
+   ]
+  }
+ ]
+}

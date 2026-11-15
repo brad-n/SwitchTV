@@ -2,13 +2,15 @@
 
 What changed in each release: [CHANGELOG.md](CHANGELOG.md) and [Releases](https://github.com/brad-n/SwitchTV/releases).
 
-SwitchTV is an Apple TV app that lists the Nintendo Switch games you have built for your Apple TV, with their box art, and opens them. It has a big banner for the game you are on, a Recently Played row, All Games, a row for each genre, a details page for each game (description, publisher, release date, players, screenshots), and a Top Shelf on the Apple TV home screen.
+SwitchTV is an Apple TV app that lists the Nintendo Switch games you have built for your Apple TV, with their box art, and opens them. It has a big banner for the game you are on, a Recently Played row, All Games, a row for each genre, a details page for each game (description, publisher, release date, players, screenshots) with an Options page for the game's settings, and a Top Shelf on the Apple TV home screen.
 
 ![The home screen: Recently Played and All Games, with the game in focus across the top](docs/screenshots/home.jpg)
 
 | Details page | Top Shelf on the home screen |
 | --- | --- |
 | ![The details page of a game](docs/screenshots/details.jpg) | ![SwitchTV's Top Shelf](docs/screenshots/topshelf.jpg) |
+
+![The Options page of Ocarina of Time: its own options, two of them changed](docs/screenshots/options.jpg)
 
 *Screenshots are from the tvOS Simulator with six games listed. No game apps are installed there, so the details page says the game cannot be opened yet, and the Top Shelf shows All Games only.*
 
@@ -53,8 +55,8 @@ You can tell SwitchTV about your games in three ways, alone or together:
       "bundleID": "com.example.wonder", "artwork": "art/wonder.jpg"}
    ]}
    ```
-   `titleID` (16 hexadecimal digits) and `name` are all that is needed. Optional: `bundleID` (the game app's bundle ID), `artwork` (a picture of your own, a path relative to the file; without it SwitchTV uses the shop banner), `artworkSource` (the shop banner address your artwork came from, so the matching product is picked when there are several).
-2. **A folder of built game apps** (`--apps-dir ~/Games/apps`): every `.app` and `.ipa` in it is read through its `Info.plist`. A game is recognised by its 16-digit title ID, found in this order: its URL scheme `switchtv-<title ID>`, an Info.plist key `SwitchTitleID`, or a 16-digit title ID in its bundle ID (the form `...g0100152000022000`). Apps without one are skipped, with a note.
+   `titleID` (16 hexadecimal digits) and `name` are all that is needed. Optional: `bundleID` (the game app's bundle ID), `artwork` (a picture of your own, a path relative to the file; without it SwitchTV uses the shop banner), `artworkSource` (the shop banner address your artwork came from, so the matching product is picked when there are several), `settings` (the game app's settings list, `dm/launcher.json` inside a TVPort-built app, for its [Options page](#game-options); or the list itself).
+2. **A folder of built game apps** (`--apps-dir ~/Games/apps`): every `.app` and `.ipa` in it is read through its `Info.plist`, and its settings list (`dm/launcher.json`) when it has one. A game is recognised by its 16-digit title ID, found in this order: its URL scheme `switchtv-<title ID>`, an Info.plist key `SwitchTitleID`, or a 16-digit title ID in its bundle ID (the form `...g0100152000022000`). Apps without one are skipped, with a note.
 3. **The apps already on your Apple TV** (`--tv-apps "Living Room"`): asks the Apple TV for its apps with `xcrun devicectl device info apps` and lists the ones whose bundle ID carries a title ID as above. `--tv-apps-json FILE` reads a saved copy of that output instead (`xcrun devicectl device info apps --device NAME --json-output FILE`).
 
 `python3 switchtv.py catalog ...` takes the same options and only makes the catalogue (`Catalog/catalog.json` and the pictures), so you can look at it first. Pass `--offline` to fetch nothing.
@@ -104,6 +106,26 @@ Update the item if it exists, add it if not. A reference implementation, from th
 
 A different group name is possible: build SwitchTV with `--group-name` and give the games the same one.
 
+## Game options
+
+A game whose app carries a settings list gets an **Options** button beside Play on its details page (or open `switchtv://options/<title ID>`). It lists the game's settings as the app's own launcher would show them on an iPhone, with the same defaults, less the ones a TV has no use for (touch feedback, the picture's fit and shape), under **Picture**, **Performance**, the game's own options (**Game options**: for Ocarina of Time on Switch 2, grass, ground mist, reflections, model detail and sun shadows), **Controls** and **Language**. The left side says what the setting under focus does and what its default is. A switch flips on Select; a choice, or a range in steps (the Apple TV has no slider), opens a list of its values. Each choice is kept at once; **Reset to Defaults** forgets them all. A value in red is not the default. A setting the game's own build fixes (TVPort writes some of its build choices, Console mode among them, into the app's `dm/env.txt`) shows its value with a lock: the game takes the build's value over a choice here, so change it in TVPort and build the game again.
+
+The game takes the choices **the next time it starts**. tvOS keeps a game you left suspended in the background, and a suspended game comes back with the settings it started with: close it first (press the TV button twice and swipe it up).
+
+**The settings list** is TVPort's `dm/launcher.json` in the game app (an app of several programs: `dm/p0/launcher.json`), made from TVPort's `dm/games/settings.tsv` for that game; the TVPort fork's `docs/frontends.md` describes its rows. `switchtv.py` reads it from an `.app` or `.ipa` (`--apps-dir`), or from the path a games file names (`settings`; TVPort names its build's). The app's `dm/env.txt` beside it says which settings the build fixes. Games found only on the Apple TV (`--tv-apps`) have no Options page: `devicectl` cannot read an app's files.
+
+**How the game gets them.** SwitchTV keeps one keychain item per game in the same access group as Recently Played:
+
+| Keychain attribute | Value |
+| --- | --- |
+| class | generic password |
+| service | `dev.tvport.switchtv.options` |
+| account | the title ID in **capitals** |
+| access group | `ABCDE12345.dev.tvport.switchtv` |
+| value | a JSON object of the choices that differ from the defaults, variable to value as text: `{"DM_FOLIAGE": "off", "DM_MODEL_LOD": "4"}` |
+
+A setting left at its default is not stored, so it follows the defaults of the game's next build; with no choice left the item is deleted. At start, before its engine reads its environment, the game app reads its item and puts each value into its environment where nothing set the variable already: its launch environment first, then the player's `env.txt` in the app's `Library/Caches`, then the app's own `dm/env.txt`, then these choices, then the game's defaults (the order the iPhone launcher gives its saved choices; `DM_SAVED_CHOICES=0` in an `env.txt` ignores them). It takes only settings of its own list, with values that list offers, and logs each one it applied, kept or skipped. The reference implementation is `dm/ios/SourcesTV/TVOptions.m` in the [TVPort fork](https://github.com/brad-n/TVPort); `Shared/GameOptions.swift` here writes the items, and both repos' tests check the format. Without the keychain group (an unsigned build) SwitchTV keeps nothing and the game reads nothing; both say so in their logs.
+
 ## For developers
 
 ### Layout
@@ -127,7 +149,7 @@ The fingerprint in that summary identifies what an installed SwitchTV was made f
 
 ### The catalogue
 
-`catalog.json` has one record per game: `titleID`, `name`, `publisher`, `releaseDate`, `numberOfPlayers`, `genres`, `description`, `intro`, `bundleID`, `scheme`, `card` and `banner` (paths of the pictures in `images/`) and `screenshots`. Fields the sources do not have are `null` or empty and the app leaves them out. Information and art come from [blawar/titledb](https://github.com/blawar/titledb)'s US list, then Nintendo's store for games it lacks a banner for, and your own `artwork` first. Everything fetched is cached in the cache folder.
+`catalog.json` has one record per game: `titleID`, `name`, `publisher`, `releaseDate`, `numberOfPlayers`, `genres`, `description`, `intro`, `bundleID`, `scheme`, `card` and `banner` (paths of the pictures in `images/`), `screenshots` and `settings` (the rows of its Options page: the settings list's fields, plus `group`, `help` and, for a setting the build fixes, `fixed`). Fields the sources do not have are `null` or empty and the app leaves them out. Information and art come from [blawar/titledb](https://github.com/blawar/titledb)'s US list, then Nintendo's store for games it lacks a banner for, and your own `artwork` first. Everything fetched is cached in the cache folder.
 
 ### Tests
 
@@ -135,7 +157,7 @@ The fingerprint in that summary identifies what an installed SwitchTV was made f
 python3 -m unittest discover -s tests -t .
 ```
 
-They cover the catalogue and its fingerprint, the project values, each input (games file, `.app` and `.ipa` Info.plists, a recorded `devicectl` output in `tests/fixtures/devicectl-apps.json`), the command line with Xcode and `devicectl` replaced by stand-ins, the Nintendo store reader against a saved page, and the Swift code the app and Top Shelf share (compiled and run with `swiftc`, macOS only). None of them need the network, Xcode projects, or an Apple TV. The fixture `devicectl-apps.json` was written by hand in the shape of devicectl's JSON; it is not a recording from a real device.
+They cover the catalogue and its fingerprint, the Options rows (from Ocarina of Time's settings list, `tests/fixtures/ocarina-launcher.json`), the project values, each input (games file, `.app` and `.ipa` Info.plists and settings lists, a recorded `devicectl` output in `tests/fixtures/devicectl-apps.json`), the command line with Xcode and `devicectl` replaced by stand-ins, the Nintendo store reader against a saved page, and the Swift code the app and Top Shelf share, game options and their keychain format included (compiled and run with `swiftc`, macOS only). None of them need the network, Xcode projects, or an Apple TV. The fixture `devicectl-apps.json` was written by hand in the shape of devicectl's JSON; it is not a recording from a real device.
 
 ### Used by TVPort
 

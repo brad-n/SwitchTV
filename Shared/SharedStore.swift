@@ -3,23 +3,27 @@
 //   account <TITLE ID IN CAPITALS>   the Unix time (seconds, as text) the game was last played; SwitchTV writes it when it opens a game, and a game app writes its own when it comes to the front
 //                                    (README, "What a game build needs"; TVPort's dm/ios/SourcesTV/TVLastPlayed.m is one implementation: keep them in step).
 //   account launchable               JSON array of the title IDs whose app answers its URL scheme, written by SwitchTV (an extension cannot ask canOpenURL).
+// A game's options (its Options page) are items of another service in the same group: Shared/GameOptions.swift.
 // Why the keychain and not an App Group: an App Group needs an App ID registered in the developer account, which Xcode can only do with an Apple ID signed in; the keychain group works under the
 // team's wildcard profile (L9492K5865.*) that automatic signing already has. tvOS keeps the keychain (it purges app files). Without the entitlement every call fails quietly and the store is empty.
 import Foundation
 import Security
 
-/// Where the records are kept: the keychain for real, a folder in the command-line checks.
+/// Where the records are kept: the keychain for real, a folder in the command-line checks. put and remove say whether the store took the change.
 protocol SharedBacking {
     func all() -> [String: Data]
-    func put(_ account: String, _ data: Data)
+    @discardableResult func put(_ account: String, _ data: Data) -> Bool
+    @discardableResult func remove(_ account: String) -> Bool
 }
 
 struct KeychainBacking: SharedBacking {
-    static let service = "dev.tvport.switchtv"
+    /// The service of the recently played records; game options have their own (Shared/GameOptions.swift).
+    static let lastPlayedService = "dev.tvport.switchtv"
+    var service = KeychainBacking.lastPlayedService
     let group: String
 
     func all() -> [String: Data] {
-        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: Self.service, kSecAttrAccessGroup as String: group,
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccessGroup as String: group,
                                     kSecMatchLimit as String: kSecMatchLimitAll, kSecReturnAttributes as String: true, kSecReturnData as String: true]
         var result: CFTypeRef?
         guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let items = result as? [[String: Any]] else { return [:] }
@@ -28,11 +32,23 @@ struct KeychainBacking: SharedBacking {
         return found
     }
 
-    func put(_ account: String, _ data: Data) {
-        let key: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: Self.service, kSecAttrAccount as String: account, kSecAttrAccessGroup as String: group]
-        if SecItemUpdate(key as CFDictionary, [kSecValueData as String: data] as CFDictionary) == errSecItemNotFound {
-            SecItemAdd(key.merging([kSecValueData as String: data, kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock]) { $1 } as CFDictionary, nil)
+    private func key(_ account: String) -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account, kSecAttrAccessGroup as String: group]
+    }
+
+    @discardableResult func put(_ account: String, _ data: Data) -> Bool {
+        var status = SecItemUpdate(key(account) as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        if status == errSecItemNotFound {
+            status = SecItemAdd(key(account).merging([kSecValueData as String: data, kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock]) { $1 } as CFDictionary, nil)
         }
+        if status != errSecSuccess { print("SwitchTV: the keychain group \(group) refused \(service) \(account) (status \(status))") }
+        return status == errSecSuccess
+    }
+
+    @discardableResult func remove(_ account: String) -> Bool {
+        let status = SecItemDelete(key(account) as CFDictionary)
+        if status != errSecSuccess && status != errSecItemNotFound { print("SwitchTV: the keychain group \(group) refused to delete \(service) \(account) (status \(status))") }
+        return status == errSecSuccess || status == errSecItemNotFound
     }
 }
 
@@ -43,9 +59,13 @@ struct FolderBacking: SharedBacking {
         for name in (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? [] { found[name] = try? Data(contentsOf: root.appendingPathComponent(name)) }
         return found
     }
-    func put(_ account: String, _ data: Data) {
+    @discardableResult func put(_ account: String, _ data: Data) -> Bool {
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        try? data.write(to: root.appendingPathComponent(account), options: .atomic)
+        return (try? data.write(to: root.appendingPathComponent(account), options: .atomic)) != nil
+    }
+    @discardableResult func remove(_ account: String) -> Bool {
+        let file = root.appendingPathComponent(account)
+        return !FileManager.default.fileExists(atPath: file.path) || (try? FileManager.default.removeItem(at: file)) != nil
     }
 }
 

@@ -53,6 +53,51 @@ class Fixture(unittest.TestCase):
         return sc.build_catalog(self.games if games is None else games, self.cache, self.out, fetch=self.fetch, scale=fake_scale)
 
 
+class OptionsTests(Fixture):
+    """The catalogue carries each game's Options page: its settings list (Ocarina of Time's, as TVPort writes it into the app) less what an Apple TV cannot use, grouped, with help, and the rows the
+    app's own env.txt sets marked fixed."""
+    LIST = json.loads((ROOT / 'tests/fixtures/ocarina-launcher.json').read_text())['settings']
+
+    def test_the_settings_rows_go_into_the_catalogue_grouped_for_the_tv(self):
+        self.games[0]['settings'] = self.LIST
+        self.games[0]['buildEnv'] = {'DM_OPMODE': '0', 'DM_BC_MAX_DIM': '256'}
+        kart, wonder = (next(g for g in self.make()['games'] if g['titleID'] == t) for t in (KART, WONDER))
+        self.assertEqual(wonder['settings'], [])   # no list: no Options page
+        rows = {s['env']: s for s in kart['settings']}
+        for gone in ('DM_TOUCH_HAPTICS', 'DM_PICTURE_FIT'):   # in the list (an iOS one) but of no use on a TV
+            self.assertIn(gone, {r['env'] for r in self.LIST})
+            self.assertNotIn(gone, rows)
+        self.assertEqual(list(dict.fromkeys(s['group'] for s in kart['settings'])), ['Picture', 'Performance', 'Game options', 'Controls', 'Language'])
+        self.assertEqual([e for e, s in rows.items() if s['group'] == 'Game options'], ['DM_FOLIAGE', 'DM_GROUND_MIST', 'DM_REFLECTION_INTERVAL', 'DM_MODEL_LOD', 'DM_SHADOW_CASCADES'])
+        self.assertEqual([e for e, s in rows.items() if s['group'] == 'Picture'][:3], ['DM_DYNAMIC_RESOLUTION', 'DM_RENDER_SCALE', 'DM_ANISO'])   # the list's order within a group
+        self.assertEqual(rows['DM_FPS_TARGET']['group'], 'Performance')
+        self.assertTrue(all(s['help'] for s in kart['settings']))   # every row has a line of help: the list's note, else SwitchTV's own
+        self.assertIn('haze', rows['DM_GROUND_MIST']['help'])
+        self.assertEqual(rows['DM_OPMODE']['fixed'], '0')   # set by the app's env.txt
+        self.assertEqual([e for e, s in rows.items() if 'fixed' in s], ['DM_OPMODE'])
+        self.assertEqual((rows['DM_FOLIAGE']['default'], rows['DM_FOLIAGE']['on'], rows['DM_FOLIAGE']['off']), ('on', 'on', 'off'))
+        self.assertEqual((rows['DM_RENDER_SCALE']['min'], rows['DM_RENDER_SCALE']['max'], rows['DM_RENDER_SCALE']['step']), (0.5, 1.0, 0.05))
+        self.assertNotIn('section', rows['DM_FOLIAGE'])   # the group replaces it
+
+    def test_rows_the_page_cannot_draw_are_left_out_and_unknown_sections_come_last(self):
+        rows = sc.tv_settings([
+            {'env': 'DM_X', 'kind': 'slider', 'label': 'X', 'default': '1'},
+            {'env': 'DM_Y', 'kind': 'choice', 'label': 'Y', 'default': '1', 'options': []},
+            {'env': 'DM_Z', 'kind': 'range', 'label': 'Z', 'default': '1', 'min': 1, 'max': 1, 'step': 0.1},
+            {'env': 'DM_NEW', 'kind': 'toggle', 'label': 'New', 'default': '0', 'section': 'Audio', 'note': ''},
+            {'env': 'DM_RUMBLE', 'kind': 'toggle', 'label': 'Game rumble', 'default': '1', 'section': 'Controls', 'note': ''},
+            {'env': 'DM_SOMETHING', 'kind': 'toggle', 'label': 'S', 'default': '0', 'section': 'Game', 'note': 'n'}])
+        self.assertEqual([(r['env'], r['group']) for r in rows], [('DM_SOMETHING', 'Picture'), ('DM_RUMBLE', 'Controls'), ('DM_NEW', 'Audio')])
+        self.assertEqual(sc.tv_settings(None), [])
+
+    def test_options_change_the_fingerprint(self):
+        self.make()
+        before = sc.fingerprint(self.out)
+        self.games[0]['settings'] = self.LIST
+        self.make()
+        self.assertNotEqual(sc.fingerprint(self.out), before)   # TVPort installs SwitchTV again when a game's settings change
+
+
 class CatalogTests(Fixture):
     def test_games_are_sorted_by_title_id(self):
         self.assertEqual([g['titleID'] for g in self.make()['games']], [WONDER, KART])
@@ -150,7 +195,9 @@ class ProjectSpecTests(unittest.TestCase):
     def test_group_name_is_the_one_game_builds_must_use(self):
         self.assertEqual(sc.group_id('L9492K5865'), 'L9492K5865.dev.tvport.switchtv')
         self.assertEqual(sc.KEYCHAIN_SERVICE, 'dev.tvport.switchtv')
-        self.assertIn('static let service = "dev.tvport.switchtv"', (ROOT / 'Shared/SharedStore.swift').read_text())   # the Swift side agrees with the Python side
+        self.assertIn('static let lastPlayedService = "dev.tvport.switchtv"', (ROOT / 'Shared/SharedStore.swift').read_text())   # the Swift side agrees with the Python side
+        self.assertEqual(sc.OPTIONS_SERVICE, 'dev.tvport.switchtv.options')
+        self.assertIn('static let service = "dev.tvport.switchtv.options"', (ROOT / 'Shared/GameOptions.swift').read_text())
 
 
 class FingerprintTests(Fixture):

@@ -2,8 +2,8 @@
 
 Pure functions where it can be (a games list and a titledb snippet are enough to test them); the network and `sips` are passed in, so a test needs neither.
 
-A "game" here is a dict: titleID (16 hex digits) and name are required; bundleID (the game app's bundle ID), artwork (a local image file) and artworkSource (the shop banner URL the
-artwork came from, so the matching product is picked) are optional.
+A "game" here is a dict: titleID (16 hex digits) and name are required; bundleID (the game app's bundle ID), artwork (a local image file), artworkSource (the shop banner URL the
+artwork came from, so the matching product is picked) and settings (the rows of the game app's own settings list, inputs.py) are optional.
 """
 from __future__ import annotations
 
@@ -28,7 +28,33 @@ TITLE_ID = re.compile(r'^[0-9A-Fa-f]{16}$')
 
 # The names SwitchTV and the games it opens agree on. A game build that wants SwitchTV to open it and to share "recently played" must use exactly these (README, "What a game build needs").
 KEYCHAIN_SERVICE = 'dev.tvport.switchtv'   # the service of the keychain items that carry last-played times (Shared/SharedStore.swift)
+OPTIONS_SERVICE = 'dev.tvport.switchtv.options'   # the service of the keychain items that carry a game's options, one per game (Shared/GameOptions.swift)
 GROUP_NAME = 'dev.tvport.switchtv'         # the keychain access group is <team ID>.<GROUP_NAME>
+
+# A game's Options page (Sources/OptionsView.swift): the rows of the game app's own settings list (a TVPort app's dm/launcher.json, made from TVPort's dm/games/settings.tsv; its docs/frontends.md describes
+# them), less those an Apple TV has no use for, each with the group the page shows it under and a line of help. The game applies the choices when it starts (README, "Game options").
+NOT_ON_TV = {'DM_TOUCH_HAPTICS', 'DM_PICTURE_FIT', 'DM_SCREEN_ASPECT', 'DM_FULLSCREEN', 'DM_TV_OUTPUT', 'DM_SW2'}   # a touch screen; a 16:9 picture on a 16:9 TV; the Mac's window, 4K output and controllers
+GROUPS = ('Picture', 'Performance', 'Game options', 'Controls', 'Language')   # in this order; a section SwitchTV does not know comes after them, under its own name
+GROUP_OF = {**dict.fromkeys(('DM_OPMODE', 'DM_RENDER_SCALE', 'DM_RES_SCALE', 'DM_DYNAMIC_RESOLUTION', 'DM_ANISO', 'DM_PRESENT_UPSCALE', 'DM_UPSCALER', 'DM_MOVIE_NETWORK'), 'Picture'),
+            **dict.fromkeys(('DM_FPS_TARGET', 'DM_FPS_HOLD', 'DM_PRESENT_SNAP', 'DM_PSO_MTL4', 'DM_PSO_PREBUILD', 'DM_NVN_ENC_THREAD', 'DM_SHOW_FPS', 'DM_METAL_HUD'), 'Performance'),
+            'DM_LANG': 'Language'}
+SECTION_GROUP = {'Game options': 'Game options', 'Performance': 'Performance', 'Controls': 'Controls', 'Game': 'Picture'}   # a row GROUP_OF does not name goes by its section
+# A line of help for the rows whose list leaves the note empty (the list writes one only for a setting with a cost)
+HELP = {
+    'DM_FPS_TARGET': 'The frame rate the game aims for. 30 leaves each frame twice the time; the game runs at its real speed either way.',
+    'DM_OPMODE': 'Docked draws the game at its TV size; Handheld at its smaller handheld size, which is lighter on the GPU.',
+    'DM_RENDER_SCALE': 'The size of the game\'s 3D picture. Lower is lighter on the GPU but softer; text and the HUD stay sharp.',
+    'DM_LANG': 'The language of the game\'s text and voices.',
+    'DM_SHOW_FPS': 'Shows the frames per second at the top left while you play.',
+    'DM_RUMBLE': 'The game\'s vibration on your controller.',
+    'DM_RUMBLE_GAIN': 'How strong the game\'s vibration is.',
+    'DM_RUMBLE_MIN': 'Vibration weaker than this stays off. Raise it if a controller hums all the time.',
+    'DM_PAD_PRESS_TO_JOIN': 'A controller becomes a player only when you press one of its buttons, so the players choose their order.',
+    'DM_NVN_ENC_THREAD': 'Prepares the GPU\'s work on a thread of its own, so the game can go on sooner. Leave it on unless a game misbehaves.',
+    'DM_FPS_HOLD': 'When frames come late, hold an even 30 fps for a while instead of a mix of 30 and 60.',
+    'DM_METAL_HUD': 'Apple\'s performance overlay over the game: frame rate, frame and GPU times, memory.',
+}
+SETTING_FIELDS = ('env', 'kind', 'label', 'default', 'options', 'min', 'max', 'step', 'on', 'off', 'needs', 'base')
 
 
 def scheme(title_id: str) -> str:
@@ -68,6 +94,38 @@ def pick_entry(titledb: dict, title_id: str, banner_url: str = '') -> dict:
     return next((e for e in candidates if e.get('bannerUrl') and not e.get('isDemo')), candidates[0] if candidates else {})
 
 
+def well_formed(row: dict) -> bool:
+    """A row the Options page can draw: a choice with [value, label] options, a range with its numbers, or a toggle; its default one of its values."""
+    if not (isinstance(row.get('label'), str) and isinstance(row.get('default'), str)):
+        return False
+    kind = row.get('kind')
+    if kind == 'choice':
+        options = row.get('options')
+        return isinstance(options, list) and bool(options) and all(isinstance(o, list) and len(o) == 2 and all(isinstance(x, str) for x in o) for o in options)
+    if kind == 'range':
+        numbers = [row.get(k) for k in ('min', 'max', 'step')]
+        return all(isinstance(n, (int, float)) and not isinstance(n, bool) for n in numbers) and numbers[0] < numbers[1] and numbers[2] > 0
+    return kind == 'toggle' and all(isinstance(row.get(k, ''), str) for k in ('on', 'off'))
+
+
+def tv_settings(rows, build_env: Optional[dict] = None) -> list:
+    """The rows of a game's Options page, from its settings list: those an Apple TV can use, grouped (GROUPS first, in their order; rows keep their order within a group), each with its help line.
+    build_env: what the app's dm/env.txt sets; a row it sets is `fixed` at that value (the game takes it over a choice, as its launcher would show a row an env file sets)."""
+    out, first = [], {}
+    for row in rows or []:
+        if not isinstance(row, dict) or row.get('env') in NOT_ON_TV or not well_formed(row):
+            continue
+        setting = {key: row[key] for key in SETTING_FIELDS if key in row}
+        setting['group'] = GROUP_OF.get(row['env']) or SECTION_GROUP.get(row.get('section')) or str(row.get('section') or 'Game')
+        setting['help'] = row.get('note') or HELP.get(row['env'], '')
+        if build_env and isinstance(build_env.get(row['env']), str):
+            setting['fixed'] = build_env[row['env']]
+        first.setdefault(setting['group'], len(first))
+        out.append(setting)
+    rank = {group: GROUPS.index(group) if group in GROUPS else len(GROUPS) + first[group] for group in first}
+    return sorted(out, key=lambda s: rank[s['group']])
+
+
 def game_record(item: dict, entry: dict, bundle: str, card: str, banner: str) -> dict:
     """One game of catalog.json. Fields the list lacks are null / empty, and the app leaves them out."""
     title_id = item['titleID'].upper()
@@ -86,6 +144,7 @@ def game_record(item: dict, entry: dict, bundle: str, card: str, banner: str) ->
         'card': card,
         'banner': banner,
         'screenshots': [s for s in entry.get('screenshots') or [] if isinstance(s, str) and s.startswith('https://')],
+        'settings': tv_settings(item.get('settings'), item.get('buildEnv')),
     }
 
 

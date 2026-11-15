@@ -108,6 +108,54 @@ class AppsFolderTests(unittest.TestCase):
             inputs.games_from_apps(Path('/nonexistent/switchtv-folder'))
 
 
+class SettingsListTests(unittest.TestCase):
+    """A game's settings list (its Options page): from a built app (dm/launcher.json, in an .app or an .ipa; an app of several programs: dm/p0/launcher.json) or named by a games file,
+    with what the app's own dm/env.txt sets."""
+    LIST = json.loads((FIXTURES / 'ocarina-launcher.json').read_text())
+
+    def test_an_app_and_an_ipa_carry_their_settings_and_build_env(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            app = root / 'Ocarina.app'
+            (app / 'dm').mkdir(parents=True)
+            (app / 'Info.plist').write_bytes(plistlib.dumps(info('dev.tvport.t.g0400486024dec000', 'Ocarina', ['switchtv-0400486024dec000'])))
+            (app / 'dm/launcher.json').write_text(json.dumps(self.LIST))
+            (app / 'dm/env.txt').write_text('# Written by TVPort\nDM_OPMODE=0\nDM_BC_MAX_DIM=256\nDM_OPMODE=1\n')
+            with zipfile.ZipFile(root / 'Kart.ipa', 'w') as package:
+                package.writestr('Payload/Kart.app/Info.plist', plistlib.dumps(info('x', 'Kart', [f'switchtv-{KART.lower()}'])))
+                package.writestr('Payload/Kart.app/dm/p0/launcher.json', json.dumps({'settings': [{'env': 'DM_RUMBLE'}, {'env': 'not-a-variable'}, 'junk']}))
+            plain = root / 'Plain.app'
+            plain.mkdir()
+            (plain / 'Info.plist').write_bytes(plistlib.dumps(info('y', 'Plain', [f'switchtv-{WONDER.lower()}'])))
+            by_id = {g['titleID']: g for g in inputs.games_from_apps(root)}
+        ocarina = by_id['0400486024DEC000']
+        self.assertEqual([r['env'] for r in ocarina['settings']], [r['env'] for r in self.LIST['settings']])
+        self.assertEqual(ocarina['buildEnv'], {'DM_OPMODE': '0', 'DM_BC_MAX_DIM': '256'})   # the first line of a key wins, as the game reads it
+        self.assertEqual(by_id[KART]['settings'], [{'env': 'DM_RUMBLE'}])                      # rows that name no DM_ variable are dropped
+        self.assertNotIn('buildEnv', by_id[KART])
+        self.assertNotIn('settings', by_id[WONDER])                                              # no list: no Options page
+
+    def test_a_games_file_names_the_list_or_gives_it(self):
+        notes = []
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'app/dm/p0').mkdir(parents=True)
+            (root / 'app/dm/p0/launcher.json').write_text(json.dumps(self.LIST))
+            (root / 'app/dm/env.txt').write_text('DM_RENDER_SCALE=0.5\n')
+            (root / 'broken.json').write_text('{nope')
+            (root / 'games.json').write_text(json.dumps({'games': [
+                {'titleID': '0400486024DEC000', 'name': 'Ocarina', 'settings': 'app/dm/p0/launcher.json'},
+                {'titleID': KART, 'name': 'Kart', 'settings': [{'env': 'DM_RUMBLE', 'kind': 'toggle'}]},
+                {'titleID': WONDER, 'name': 'Wonder', 'settings': 'broken.json'}]}))
+            games = inputs.games_from_json(root / 'games.json', notes.append)
+        ocarina, kart, wonder = sorted(games, key=lambda g: g['name'])[1], sorted(games, key=lambda g: g['name'])[0], sorted(games, key=lambda g: g['name'])[2]
+        self.assertEqual(len(ocarina['settings']), len(self.LIST['settings']))
+        self.assertEqual(ocarina['buildEnv'], {'DM_RENDER_SCALE': '0.5'})   # a program's list: the app's env.txt one folder up
+        self.assertEqual(kart['settings'], [{'env': 'DM_RUMBLE', 'kind': 'toggle'}])
+        self.assertNotIn('settings', wonder)
+        self.assertTrue(any('broken.json' in n and 'without options' in n for n in notes))
+
+
 class DevicectlTests(unittest.TestCase):
     def test_reads_the_recorded_output(self):
         games = inputs.games_from_devicectl_file(FIXTURES / 'devicectl-apps.json')

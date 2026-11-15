@@ -24,8 +24,9 @@ enum Shelf {
     /// switchtv://game/<TITLE ID>: SwitchTV opens that game's details page.
     static func detailsURL(_ titleID: String) -> URL { URL(string: "\(openScheme)://game/\(titleID.uppercased())")! }
 
-    static func titleID(from url: URL) -> String? {
-        guard url.scheme == openScheme, url.host == "game" else { return nil }
+    /// The game of a switchtv://game/<title ID> link (its details), or of switchtv://options/<title ID> with `host` "options" (its Options page).
+    static func titleID(from url: URL, host: String = "game") -> String? {
+        guard url.scheme == openScheme, url.host == host else { return nil }
         let id = url.lastPathComponent.uppercased()
         return id.count == 16 && id.allSatisfy(\.isHexDigit) ? id : nil
     }

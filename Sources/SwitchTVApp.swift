@@ -18,8 +18,9 @@ struct SwitchTVApp: App {
             .tint(Theme.accent)
             .background(Theme.background.ignoresSafeArea())
             .onChange(of: phase) { _, new in if new == .active { library.refresh() } }
-            .onOpenURL { url in   // switchtv://game/<title ID>: the Top Shelf's way in for a game that cannot be opened directly
+            .onOpenURL { url in   // switchtv://game/<title ID>: the Top Shelf's way in for a game that cannot be opened directly; switchtv://options/<title ID>: that game's Options page
                 if let id = Shelf.titleID(from: url), let game = library.catalog.game(id) { router.show(game) }
+                if let id = Shelf.titleID(from: url, host: "options"), let game = library.catalog.game(id), !game.options.isEmpty { router.show(game, options: true) }
             }
             .alert("Can\u{2019}t play yet", isPresented: Binding(get: { library.notice != nil }, set: { if !$0 { library.notice = nil } })) {
                 Button("OK", role: .cancel) {}

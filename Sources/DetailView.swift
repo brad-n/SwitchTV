@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DetailView: View {
     @EnvironmentObject private var library: Library
+    @EnvironmentObject private var router: Router
     let game: CatalogGame
 
     var body: some View {
@@ -30,6 +31,7 @@ struct DetailView: View {
             }
         }
         .onAppear { library.refresh() }
+        .navigationDestination(isPresented: $router.options) { OptionsView(game: game, store: library.options) }
     }
 
     private var metaLine: some View {
@@ -37,10 +39,15 @@ struct DetailView: View {
         return Text(parts.joined(separator: "  \u{2022}  ")).font(.title3).foregroundStyle(Theme.textSecondary)
     }
 
-    /// Play is always there: Select opens the game, or says to rebuild it (an alert, and the line under the button).
+    /// Play is always there: Select opens the game, or says to rebuild it (an alert, and the line under the button). Options, beside it, when the game app has settings.
     private var playArea: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Button { library.select(game) } label: { Label("Play", systemImage: "play.fill").font(.headline).padding(.horizontal, 28) }.tint(Theme.accent)
+            HStack(spacing: 30) {
+                Button { library.select(game) } label: { Label("Play", systemImage: "play.fill").font(.headline).padding(.horizontal, 28) }.tint(Theme.accent)
+                if !game.options.isEmpty {
+                    Button { router.options = true } label: { Label("Options", systemImage: "slider.horizontal.3").font(.headline).padding(.horizontal, 28) }
+                }
+            }
             if !library.canPlay(game) {
                 Text(Library.rebuildMessage(game)).font(.callout).foregroundStyle(Theme.textSecondary)
             }

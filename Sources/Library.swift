@@ -12,9 +12,14 @@ final class Library: ObservableObject {
     /// A message for the owner (an alert): set when a game cannot be opened.
     @Published var notice: String?
     private let store = SharedStore()
+    /// The games' options (their Options page); nil without the keychain group.
+    let options = OptionsStore()
     private static let key = "lastLaunched"
 
-    init() { refresh() }
+    init() {
+        if options == nil { print("SwitchTV: no keychain group (SwitchTVGroup) in this build, so game options are not kept and the games start with their defaults") }
+        refresh()
+    }
 
     /// Most recently played first (from here or from the game itself).
     var recent: [CatalogGame] {
@@ -60,9 +65,10 @@ final class Library: ObservableObject {
     }
 }
 
-/// The details page that is showing (a stack of at most one), opened by long-press / Play-Pause on a poster or by a switchtv://game/<title ID> link from the Top Shelf.
+/// The details page that is showing (a stack of at most one), opened by long-press / Play-Pause on a poster or by a switchtv://game/<title ID> link from the Top Shelf; and whether its Options page is open.
 @MainActor
 final class Router: ObservableObject {
     @Published var path: [CatalogGame] = []
-    func show(_ game: CatalogGame) { path = [game] }
+    @Published var options = false
+    func show(_ game: CatalogGame, options: Bool = false) { path = [game]; self.options = options }
 }

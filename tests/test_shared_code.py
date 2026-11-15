@@ -1,5 +1,6 @@
-"""The code SwitchTV and its Top Shelf extension share (Shared/): the catalogue, the shared store and the Top Shelf plan, compiled for the Mac and run on their own.
-Also that a record in the format game apps write ("recently played": one file per title ID in capitals holding the Unix time as text, README "What a game build needs") is read by the store."""
+"""The code SwitchTV and its Top Shelf extension share (Shared/): the catalogue, the shared store, a game's options and the Top Shelf plan, compiled for the Mac and run on their own.
+Also that a record in the format game apps write ("recently played": one file per title ID in capitals holding the Unix time as text, README "What a game build needs") is read by the store,
+and that a game's options are kept in the format the game app reads at boot (one item per title ID in capitals holding a JSON object of DM_ variable to value, README "Game options")."""
 from pathlib import Path
 import subprocess
 import sys
@@ -76,6 +77,7 @@ func game(_ id: String, _ name: String, genres: [String] = [], card: String = ""
         assert(Set(sections.flatMap(\.items).map(\.identifier)).count == 6)            // identifiers are unique across sections
         assert(Shelf.titleID(from: URL(string: "switchtv://game/0100000000000004")!) == "0100000000000004")
         assert(Shelf.titleID(from: URL(string: "switchtv://game/zzz")!) == nil && Shelf.titleID(from: URL(string: "other://game/0100000000000004")!) == nil)
+        assert(Shelf.titleID(from: URL(string: "switchtv://options/0400486024dec000")!, host: "options") == "0400486024DEC000" && Shelf.titleID(from: URL(string: "switchtv://options/0400486024DEC000")!) == nil)
         // nothing played: only All Games; many played: at most 8
         assert(Shelf.sections(catalog: catalog, lastPlayed: [:], launchable: [], imageFolder: catalogFolder).map(\.title) == ["All Games"])
         assert(Shelf.sections(catalog: Catalog(generated: "", games: []), lastPlayed: [:], launchable: [], imageFolder: catalogFolder).isEmpty)
@@ -83,6 +85,47 @@ func game(_ id: String, _ name: String, genres: [String] = [], card: String = ""
         let big = Catalog(generated: "", games: many.map { try! JSONDecoder().decode(CatalogGame.self, from: game($0, "G\($0)").data(using: .utf8)!) })
         let bigShelf = Shelf.sections(catalog: big, lastPlayed: Dictionary(uniqueKeysWithValues: many.enumerated().map { ($1, Double($0)) }), launchable: [], imageFolder: catalogFolder)
         assert(bigShelf[0].items.count == 8 && bigShelf[0].items[0].titleID == "0100000000000012")
+        // a game's Options rows (as the catalogue writes them) and the store of its choices
+        let rowsJSON = """
+        [{"env":"DM_RENDER_SCALE","kind":"range","label":"Render scale","default":"1.0","min":0.5,"max":1.0,"step":0.05,"group":"Picture","help":"h","base":{"docked":[1920,1080],"handheld":[1280,720]}},
+         {"env":"DM_FOLIAGE","kind":"toggle","label":"Grass and ground cover","default":"on","on":"on","off":"off","group":"Game options","help":"g"},
+         {"env":"DM_ANISO","kind":"choice","label":"Anisotropic filtering","default":"0","options":[["0","Auto"],["16","16x"]],"group":"Picture"},
+         {"env":"DM_RUMBLE_GAIN","kind":"range","label":"Rumble strength","default":"1.0","min":0,"max":3,"step":0.1,"group":"Controls","needs":"DM_RUMBLE=1"},
+         {"env":"DM_OPMODE","kind":"choice","label":"Console mode","default":"1","options":[["1","Docked"],["0","Handheld"]],"group":"Picture","fixed":"0"}]
+        """
+        let rows = try JSONDecoder().decode([GameSetting].self, from: Data(rowsJSON.utf8))
+        let (scale, grass, aniso, gain, opmode) = (rows[0], rows[1], rows[2], rows[3], rows[4])
+        assert(scale.values.count == 11 && scale.values.first == "0.50" && scale.values.last == "1.00")   // tvOS has no slider: a range is its steps
+        assert(gain.values.count == 31 && gain.values[10] == "1.00" && gain.parent! == ("DM_RUMBLE", "1"))
+        assert(scale.isDefault("1.00") && !scale.isDefault("0.95") && scale.accepts("0.75") && !scale.accepts("0.25") && !scale.accepts("0x1") && !scale.accepts("nan"))
+        assert(scale.text("0.50") == "960 \u{d7} 540 (50 %)" && scale.text("0.50", docked: false) == "640 \u{d7} 360 (50 %)" && gain.text("1.50") == "150 %")
+        assert(grass.values == ["on", "off"] && grass.text("off") == "Off" && grass.text("on") == "On" && grass.accepts("off") && !grass.accepts("0"))
+        assert(aniso.text("16") == "16x" && !aniso.accepts("8") && aniso.parent == nil && opmode.fixed == "0" && scale.fixed == nil)
+
+        let optionsRoot = root.appendingPathComponent("Options")
+        let options = OptionsStore(backing: FolderBacking(root: optionsRoot))
+        let ocarina = "0400486024DEC000"
+        assert(options.choices(ocarina).isEmpty)
+        assert(options.choose(ocarina, scale, "0.50") && options.choose(ocarina, grass, "off") && options.choose(ocarina, aniso, "16"))
+        assert(!options.choose(ocarina, aniso, "8") && !options.choose("not-a-title-id", grass, "off"))   // a value the game does not offer; not a game
+        assert(options.choices(ocarina) == ["DM_RENDER_SCALE": "0.50", "DM_FOLIAGE": "off", "DM_ANISO": "16"])
+        assert(options.choose(ocarina, aniso, "0") && options.choose(ocarina, scale, "1.00"))           // back to the default: forgotten, so the game's next defaults apply
+        assert(options.choices("0400486024dec000") == ["DM_FOLIAGE": "off"])                            // any letter case
+        // the item the game app reads at boot (TVPort's SourcesTV/TVOptions.m): account = the title ID in capitals, value = a JSON object of strings
+        let item = try JSONSerialization.jsonObject(with: Data(contentsOf: optionsRoot.appendingPathComponent(ocarina))) as! [String: Any]
+        assert(item.count == 1 && item["DM_FOLIAGE"] as? String == "off")
+        // one written by hand or by another tool is read the same way; a value that is not text is ignored
+        try #"{"DM_MODEL_LOD":"4","DM_X":3}"#.write(to: optionsRoot.appendingPathComponent("0100000000000001"), atomically: true, encoding: .utf8)
+        assert(options.choices("0100000000000001") == ["DM_MODEL_LOD": "4"])
+        assert(options.reset(ocarina) && options.choices(ocarina).isEmpty && !fm.fileExists(atPath: optionsRoot.appendingPathComponent(ocarina).path))   // Reset deletes the item
+        assert(options.reset(ocarina))                                                                  // nothing to forget is no failure
+        assert(OptionsStore.service == "dev.tvport.switchtv.options" && OptionsStore(group: nil) == nil && OptionsStore(group: "") == nil)   // no group: no store
+        assert(store.lastPlayed() == ["0100000000000001": 1000, "0100000000000003": 3000])              // options are kept apart from the recently played records
+
+        // the catalogue: a game with a settings list has its rows, one from before options has none
+        let withOptions = #"{"generated":"x","games":[{"titleID":"0400486024DEC000","name":"Ocarina","genres":[],"bundleID":"b","scheme":"switchtv-0400486024dec000","card":"","banner":"","screenshots":[],"settings":\#(rowsJSON)}]}"#
+        let optionsCatalog = try JSONDecoder().decode(Catalog.self, from: Data(withOptions.utf8))
+        assert(optionsCatalog.games[0].options.map(\.env) == rows.map(\.env) && catalog.game("0100000000000002")!.options.isEmpty)
         print("PASS")
     }
 }

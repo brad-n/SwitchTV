@@ -16,13 +16,17 @@ struct CatalogGame: Codable, Identifiable, Hashable {
     let card: String             // image paths, relative to Catalog
     let banner: String
     let screenshots: [String]    // URLs
+    let settings: [GameSetting]? // its Options page; absent in a catalogue from before options
 
     var id: String { titleID }
     var playURL: URL? { URL(string: "\(scheme)://play") }
 
     enum CodingKeys: String, CodingKey {
-        case titleID, name, publisher, releaseDate, numberOfPlayers, genres, summary = "description", intro, bundleID, scheme, card, banner, screenshots
+        case titleID, name, publisher, releaseDate, numberOfPlayers, genres, summary = "description", intro, bundleID, scheme, card, banner, screenshots, settings
     }
+
+    /// The rows of its Options page, in the order to show them; empty when the game app has no settings list.
+    var options: [GameSetting] { settings ?? [] }
 
     var releaseYear: String? {
         guard let releaseDate, releaseDate.count >= 4, releaseDate.prefix(4).allSatisfy(\.isNumber) else { return nil }
@@ -46,6 +50,77 @@ struct CatalogGame: Codable, Identifiable, Hashable {
 
     /// The description, as long as the shop gave it.
     var blurb: String? { summary ?? intro }
+}
+
+/// One setting of a game's Options page: a row of the game app's own settings list (TVPort's dm/launcher.json; switchtv_cli/catalog.py tv_settings adds its group and help line). Its value is the text the
+/// game puts in its environment variable `env` when it starts (Shared/GameOptions.swift). The checks agree with the game's launcher (TVPort's dm/ios/Sources/LauncherSettings.swift) and its boot (TVOptions.m).
+struct GameSetting: Codable, Hashable, Identifiable {
+    let env, kind, label, def: String
+    let group: String
+    let help: String?
+    let options: [[String]]?     // choice: [value, label]
+    let min, max, step: Double?  // range
+    let on, off: String?         // toggle: the values the variable takes (1 / 0 when not given)
+    let needs: String?           // "<VAR>=<value>": shown only while that setting has that value
+    let base: Base?              // render scale: the 3D picture's size at 1.0, docked and handheld
+    let fixed: String?           // the value the game app's own env.txt sets: the game takes it over a choice, so the page shows it and does not change it
+    struct Base: Codable, Hashable { let docked, handheld: [Int] }
+
+    var id: String { env }
+    var onValue: String { on ?? "1" }
+    var offValue: String { off ?? "0" }
+
+    enum CodingKeys: String, CodingKey { case env, kind, label, def = "default", group, help, options, min, max, step, on, off, needs, base, fixed }
+
+    /// A range compares as numbers (its steps are written with two decimals: 1.00 is the default 1.0).
+    func isDefault(_ value: String) -> Bool {
+        kind == "range" ? abs((Double(value) ?? .nan) - (Double(def) ?? .nan)) < 1e-6 : value == def
+    }
+
+    /// A value the game offers (a saved choice the game no longer offers is dropped).
+    func accepts(_ value: String) -> Bool {
+        switch kind {
+        case "choice": return options?.contains { $0.first == value } ?? false
+        case "range":
+            guard !value.contains(where: { $0 == "x" || $0 == "X" }), let n = Double(value), n.isFinite, let lo = min, let hi = max else { return false }
+            return n >= lo - 1e-9 && n <= hi + 1e-9
+        case "toggle": return value == onValue || value == offValue
+        default: return false
+        }
+    }
+
+    /// The values the page offers, in order: a choice's options, a toggle's on and off, a range's steps (tvOS has no slider).
+    var values: [String] {
+        switch kind {
+        case "choice": return (options ?? []).compactMap(\.first)
+        case "toggle": return [onValue, offValue]
+        case "range":
+            guard let lo = min, let hi = max, let step, step > 0 else { return [def] }
+            let count = Int(((hi - lo) / step).rounded(.down) + 1e-6)
+            return (0...Swift.max(count, 0)).map { String(format: "%.2f", lo + Double($0) * step) }
+        default: return [def]
+        }
+    }
+
+    /// What a value is called on screen. A range is a percentage, with the picture's size in pixels for the console mode when the list has it (`docked`: DM_OPMODE is not 0).
+    func text(_ value: String, docked: Bool = true) -> String {
+        switch kind {
+        case "choice": return options?.first { $0.first == value }.map { $0.count > 1 ? $0[1] : $0[0] } ?? value
+        case "toggle": return value == onValue ? "On" : "Off"
+        case "range":
+            guard let n = Double(value) else { return value }
+            let percent = "\(Int((n * 100).rounded())) %"
+            guard let size = base.map({ docked ? $0.docked : $0.handheld }), size.count == 2 else { return percent }
+            return "\(Int((Double(size[0]) * n).rounded())) \u{d7} \(Int((Double(size[1]) * n).rounded())) (\(percent))"
+        default: return value
+        }
+    }
+
+    /// The setting `needs` names and the value it must have; nil for a setting that is always shown.
+    var parent: (env: String, value: String)? {
+        guard let needs, let eq = needs.firstIndex(of: "=") else { return nil }
+        return (String(needs[..<eq]), String(needs[needs.index(after: eq)...]))
+    }
 }
 
 struct Catalog: Codable {
