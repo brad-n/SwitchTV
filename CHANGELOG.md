@@ -4,7 +4,9 @@ What changes in each release, in plain terms. Releases are tagged `v<version>` a
 
 ## Unreleased
 
-Version 0.3.0, not released yet.
+Nothing yet.
+
+## 0.3.0 (2026-11-16)
 
 **Presets**
 - A **Preset** row at the top of a game's Options page: Performance, Balanced or Quality sets a group of the game's options in one choice. Change any of those options afterwards and the row reads Custom; with every one of them at its default it reads Default (or the preset equal to the defaults). Choosing a preset does not change a setting it does not name.
