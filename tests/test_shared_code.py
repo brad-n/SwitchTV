@@ -128,6 +128,21 @@ func game(_ id: String, _ name: String, genres: [String] = [], card: String = ""
         let withOptions = #"{"generated":"x","games":[{"titleID":"0400486024DEC000","name":"Ocarina","genres":[],"bundleID":"b","scheme":"switchtv-0400486024dec000","card":"","banner":"","screenshots":[],"settings":\#(rowsJSON)}]}"#
         let optionsCatalog = try JSONDecoder().decode(Catalog.self, from: Data(withOptions.utf8))
         assert(optionsCatalog.games[0].options.map(\.env) == rows.map(\.env) && catalog.game("0100000000000002")!.options.isEmpty)
+
+        // presets: choosing one sets what it names (a setting only another preset names goes to its default); Custom after a single change; Default when none matches but all are at their defaults
+        let presetJSON = #"{"generated":"x","games":[{"titleID":"0400486024DEC000","name":"Ocarina","genres":[],"bundleID":"b","scheme":"s","card":"","banner":"","screenshots":[],"settings":[{"env":"DM_ANISO","kind":"choice","label":"Aniso","default":"0","group":"Picture","options":[["0","Auto"],["16","16x"]]},{"env":"DM_FOLIAGE","kind":"toggle","label":"Grass","default":"on","on":"on","off":"off","group":"Game options"},{"env":"DM_RES_SCALE","kind":"range","label":"Scale","default":"1.0","min":0.5,"max":2.0,"step":0.25,"group":"Picture"},{"env":"DM_OPMODE","kind":"choice","label":"Mode","default":"0","setByBuild":true,"group":"Picture","options":[["1","Docked"],["0","Handheld"]]}],"presets":[{"name":"Performance","values":{"DM_FOLIAGE":"off"}},{"name":"Balanced","values":{}},{"name":"Quality","values":{"DM_ANISO":"16"}}]},{"titleID":"0400486024DEC001","name":"Plain","genres":[],"bundleID":"b","scheme":"s","card":"","banner":"","screenshots":[]}]}"#
+        let pg = try JSONDecoder().decode(Catalog.self, from: Data(presetJSON.utf8)).games
+        let pg0 = pg[0]
+        assert(pg0.presetList.map(\.name) == ["Performance", "Balanced", "Quality"] && pg0.presetSettings.map(\.env) == ["DM_ANISO", "DM_FOLIAGE"] && pg[1].presetList.isEmpty && pg[1].presetName([:]) == nil)
+        assert(pg0.presetName([:]) == "Balanced")                                                       // Balanced names nothing: the defaults are Balanced
+        assert(pg0.presetValues("Quality").map { "\($0.setting.env)=\($0.value)" } == ["DM_ANISO=16", "DM_FOLIAGE=on"])   // Quality does not name the grass: its default
+        assert(pg0.presetValues("Performance").map { "\($0.setting.env)=\($0.value)" } == ["DM_ANISO=0", "DM_FOLIAGE=off"] && pg0.presetValues("Nonsense").isEmpty)
+        assert(pg0.presetName(["DM_FOLIAGE": "off"]) == "Performance" && pg0.presetName(["DM_ANISO": "16"]) == "Quality")
+        assert(pg0.presetName(["DM_ANISO": "16", "DM_FOLIAGE": "off"]) == "Custom")                    // one more change after a preset
+        assert(pg0.presetName(["DM_OPMODE": "1", "DM_RES_SCALE": "1.75"]) == "Balanced")               // settings no preset names do not matter
+        let noBalanced = try JSONDecoder().decode(Catalog.self, from: Data(presetJSON.replacingOccurrences(of: #"{"name":"Balanced","values":{}},"#, with: "").utf8)).games[0]
+        assert(noBalanced.presetName([:]) == "Default" && noBalanced.presetName(["DM_FOLIAGE": "off"]) == "Performance")   // the defaults match no preset: shown honestly as Default
+        assert(pg0.settings![2].same("1.50", "1.5") && !pg0.settings![0].same("0", "16"))
         print("PASS")
     }
 }

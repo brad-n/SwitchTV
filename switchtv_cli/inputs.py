@@ -67,15 +67,31 @@ def settings_rows(data) -> Optional[list]:
     return [row for row in rows if isinstance(row, dict) and isinstance(row.get('env'), str) and ENV_NAME.match(row['env'])]
 
 
-def read_settings_file(path: Path, log: Callable[[str], None] = lambda _: None) -> Optional[list]:
+def settings_presets(data) -> Optional[list]:
+    """The presets of a settings list (launcher.json's "presets": [{"name": ..., "values": {"DM_X": "value"}}]), those with a name and text values; None when it has none."""
+    found = data.get('presets') if isinstance(data, dict) else None
+    if not isinstance(found, list):
+        return None
+    out = [{'name': p['name'], 'values': {k: v for k, v in p['values'].items() if isinstance(k, str) and ENV_NAME.match(k) and isinstance(v, str)}}
+           for p in found if isinstance(p, dict) and isinstance(p.get('name'), str) and p['name'] and isinstance(p.get('values'), dict)]
+    return out or None
+
+
+def read_settings_list(path: Path, log: Callable[[str], None] = lambda _: None) -> tuple:
+    """(the rows, the presets) of a settings file; None for each it lacks."""
     try:
-        rows = settings_rows(json.loads(Path(path).read_text()))
+        data = json.loads(Path(path).read_text())
+        rows = settings_rows(data)
     except (OSError, ValueError) as error:
         log(f'The settings list {path} could not be read ({error}); the game is listed without options')
-        return None
+        return None, None
     if rows is None:
         log(f'The settings list {path} has no "settings" list; the game is listed without options')
-    return rows
+    return rows, settings_presets(data)
+
+
+def read_settings_file(path: Path, log: Callable[[str], None] = lambda _: None) -> Optional[list]:
+    return read_settings_list(path, log)[0]
 
 
 def normalize(item: dict, base: Optional[Path] = None, log: Callable[[str], None] = lambda _: None) -> Optional[dict]:
@@ -98,14 +114,17 @@ def normalize(item: dict, base: Optional[Path] = None, log: Callable[[str], None
     if isinstance(settings, str) and settings:   # a launcher.json file, and the app's env.txt beside it
         path = Path(settings).expanduser()
         path = path if path.is_absolute() or base is None else base / path
-        rows = read_settings_file(path, log)
+        rows, presets = read_settings_list(path, log)
         env = build_env_beside(path) if rows is not None else None
         if env is not None:
             game['buildEnv'] = env
     else:
         rows = settings_rows(settings) if isinstance(settings, (list, dict)) else None
+        presets = settings_presets(settings)
     if rows is not None:
         game['settings'] = rows
+        if presets:
+            game['presets'] = presets
     return game
 
 
@@ -199,19 +218,26 @@ def read_app_file(app: Path, name: str) -> Optional[bytes]:
         return None
 
 
-def read_app_settings(app: Path) -> tuple:
-    """(the settings list inside an .app or .ipa (SETTINGS_FILES), what its dm/env.txt sets); each None when it has none or it cannot be read."""
-    rows = None
+def read_app_list(app: Path) -> tuple:
+    """(the settings list inside an .app or .ipa (SETTINGS_FILES), its presets, what its dm/env.txt sets); each None when it has none or it cannot be read."""
+    rows = presets = None
     for name in SETTINGS_FILES:
         data = read_app_file(app, name)
         if data is not None:
             try:
-                rows = settings_rows(json.loads(data))
+                parsed = json.loads(data)
+                rows, presets = settings_rows(parsed), settings_presets(parsed)
             except ValueError:
                 rows = None
             break
     env = read_app_file(app, BUILD_ENV) if rows is not None else None
-    return rows, env_file(env.decode('utf-8', 'replace')) if env is not None else None
+    return rows, presets, env_file(env.decode('utf-8', 'replace')) if env is not None else None
+
+
+def read_app_settings(app: Path) -> tuple:
+    """(the settings list inside an .app or .ipa, what its dm/env.txt sets); each None when it has none or it cannot be read."""
+    rows, _, env = read_app_list(app)
+    return rows, env
 
 
 def games_from_apps(folder: Path, log: Callable[[str], None] = lambda _: None) -> list:
@@ -226,9 +252,11 @@ def games_from_apps(folder: Path, log: Callable[[str], None] = lambda _: None) -
             log(f'{app.name}: not read ({error})')
             continue
         if game:
-            settings, env = read_app_settings(app)
+            settings, presets, env = read_app_list(app)
             if settings is not None:
                 game['settings'] = settings
+                if presets:
+                    game['presets'] = presets
             if env is not None:
                 game['buildEnv'] = env
             games.append(game)

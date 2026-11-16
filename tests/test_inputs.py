@@ -113,6 +113,23 @@ class SettingsListTests(unittest.TestCase):
     with what the app's own dm/env.txt sets."""
     LIST = json.loads((FIXTURES / 'ocarina-launcher.json').read_text())
 
+    def test_presets_are_read_with_the_settings_from_an_app_a_file_and_inline(self):
+        presets = [{'name': 'Quality', 'values': {'DM_ANISO': '16', 'bad': '1', 'DM_X': 3}}, {'name': '', 'values': {}}, {'values': {}}, 'junk']
+        listed = {**self.LIST, 'presets': presets}
+        want = [{'name': 'Quality', 'values': {'DM_ANISO': '16'}}]   # a name and text values for DM_ variables only
+        self.assertEqual(inputs.settings_presets(listed), want)
+        self.assertIsNone(inputs.settings_presets(self.LIST))
+        self.assertIsNone(inputs.settings_presets({'presets': 'no'}))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'app/dm').mkdir(parents=True)
+            (root / 'app/dm/launcher.json').write_text(json.dumps(listed))
+            self.assertEqual(inputs.read_app_list(root / 'app')[:2][1], want)
+            self.assertEqual(inputs.read_app_settings(root / 'app')[0], inputs.settings_rows(listed))   # the older pair still reads the same
+            self.assertEqual(inputs.read_settings_list(root / 'app/dm/launcher.json')[1], want)
+        self.assertEqual(inputs.normalize({'titleID': '0400486024DEC000', 'name': 'O', 'settings': listed})['presets'], want)
+        self.assertNotIn('presets', inputs.normalize({'titleID': '0400486024DEC000', 'name': 'O', 'settings': self.LIST}))
+
     def test_an_app_and_an_ipa_carry_their_settings_and_build_env(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

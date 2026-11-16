@@ -127,10 +127,36 @@ def tv_settings(rows, build_env: Optional[dict] = None) -> list:
     return sorted(out, key=lambda s: rank[s['group']])
 
 
+def accepts(row: dict, value: str) -> bool:
+    """Whether a row of the Options page takes `value` (the same rules as GameSetting.accepts in Shared/Catalog.swift)."""
+    kind = row.get('kind')
+    if kind == 'choice':
+        return any(o[0] == value for o in row['options'])
+    if kind == 'toggle':
+        return value in (row.get('on', '1'), row.get('off', '0'))
+    try:
+        return 'x' not in value.lower() and row['min'] - 1e-9 <= float(value) <= row['max'] + 1e-9
+    except ValueError:
+        return False
+
+
+def tv_presets(presets, rows: list) -> list:
+    """A game's presets for its Options page: each preset's values for the rows the page has (a setting the TV leaves out, or a value its row does not take, is dropped). A preset left with no
+    value is dropped too, except Balanced, which may name nothing (it is then the defaults). The presets come from the settings list (TVPort's dm/games/presets.tsv); [] when it has none."""
+    by_env = {row['env']: row for row in rows}
+    out = []
+    for preset in presets or []:
+        values = {env: v for env, v in preset['values'].items() if env in by_env and accepts(by_env[env], v)}
+        if values or preset['name'] == 'Balanced':
+            out.append({'name': preset['name'], 'values': values})
+    return out if any(p['values'] for p in out) else []
+
+
 def game_record(item: dict, entry: dict, bundle: str, card: str, banner: str) -> dict:
     """One game of catalog.json. Fields the list lacks are null / empty, and the app leaves them out."""
     title_id = item['titleID'].upper()
     players = entry.get('numberOfPlayers')
+    settings = tv_settings(item.get('settings'), item.get('buildEnv'))
     return {
         'titleID': title_id,
         'name': item.get('name') or entry.get('name') or title_id,
@@ -145,7 +171,8 @@ def game_record(item: dict, entry: dict, bundle: str, card: str, banner: str) ->
         'card': card,
         'banner': banner,
         'screenshots': [s for s in entry.get('screenshots') or [] if isinstance(s, str) and s.startswith('https://')],
-        'settings': tv_settings(item.get('settings'), item.get('buildEnv')),
+        'settings': settings,
+        'presets': tv_presets(item.get('presets'), settings),
     }
 
 

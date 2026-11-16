@@ -17,16 +17,45 @@ struct CatalogGame: Codable, Identifiable, Hashable {
     let banner: String
     let screenshots: [String]    // URLs
     let settings: [GameSetting]? // its Options page; absent in a catalogue from before options
+    let presets: [GamePreset]?   // its presets (Performance, Balanced, Quality), from the game app's settings list; absent or empty when it has none
 
     var id: String { titleID }
     var playURL: URL? { URL(string: "\(scheme)://play") }
 
     enum CodingKeys: String, CodingKey {
-        case titleID, name, publisher, releaseDate, numberOfPlayers, genres, summary = "description", intro, bundleID, scheme, card, banner, screenshots, settings
+        case titleID, name, publisher, releaseDate, numberOfPlayers, genres, summary = "description", intro, bundleID, scheme, card, banner, screenshots, settings, presets
     }
 
     /// The rows of its Options page, in the order to show them; empty when the game app has no settings list.
     var options: [GameSetting] { settings ?? [] }
+
+    /// The presets the Options page offers, in order; empty when the game has none.
+    var presetList: [GamePreset] { presets ?? [] }
+
+    /// The settings the presets name: choosing a preset sets each of them, to the value the preset gives it, else to the setting's default.
+    var presetSettings: [GameSetting] {
+        let named = Set(presetList.flatMap { $0.values.keys })
+        return options.filter { named.contains($0.env) }
+    }
+
+    /// The value choosing `preset` gives `setting`.
+    func target(_ preset: GamePreset, _ setting: GameSetting) -> String { preset.values[setting.env] ?? setting.def }
+
+    /// The settings choosing a preset sets, with their values; empty for a name the game does not have.
+    func presetValues(_ name: String) -> [(setting: GameSetting, value: String)] {
+        guard let preset = presetList.first(where: { $0.name == name }) else { return [] }
+        return presetSettings.map { ($0, target(preset, $0)) }
+    }
+
+    /// The preset the choices `values` (setting env to value; a missing one is its default) match, the first in the list; else "Default" when every setting a preset names is at its default;
+    /// else "Custom". nil for a game without presets.
+    func presetName(_ values: [String: String]) -> String? {
+        guard !presetList.isEmpty else { return nil }
+        let named = presetSettings
+        func have(_ s: GameSetting) -> String { values[s.env] ?? s.def }
+        if let match = presetList.first(where: { p in named.allSatisfy { $0.same(have($0), target(p, $0)) } }) { return match.name }
+        return named.allSatisfy { $0.isDefault(have($0)) } ? "Default" : "Custom"
+    }
 
     var releaseYear: String? {
         guard let releaseDate, releaseDate.count >= 4, releaseDate.prefix(4).allSatisfy(\.isNumber) else { return nil }
@@ -52,6 +81,9 @@ struct CatalogGame: Codable, Identifiable, Hashable {
     var blurb: String? { summary ?? intro }
 }
 
+/// A preset of a game's Options page (TVPort's dm/games/presets.tsv, through the game app's settings list): the values it names. A setting another preset names and this one does not goes to its default.
+struct GamePreset: Codable, Hashable { let name: String; let values: [String: String] }
+
 /// One setting of a game's Options page: a row of the game app's own settings list (TVPort's dm/launcher.json; switchtv_cli/catalog.py tv_settings adds its group and help line). Its value is the text the
 /// game puts in its environment variable `env` when it starts (Shared/GameOptions.swift). The checks agree with the game's launcher (TVPort's dm/ios/Sources/LauncherSettings.swift) and its boot (TVOptions.m).
 struct GameSetting: Codable, Hashable, Identifiable {
@@ -74,8 +106,11 @@ struct GameSetting: Codable, Hashable, Identifiable {
     enum CodingKeys: String, CodingKey { case env, kind, label, def = "default", group, help, options, min, max, step, on, off, needs, base, setByBuild }
 
     /// A range compares as numbers (its steps are written with two decimals: 1.00 is the default 1.0).
-    func isDefault(_ value: String) -> Bool {
-        kind == "range" ? abs((Double(value) ?? .nan) - (Double(def) ?? .nan)) < 1e-6 : value == def
+    func isDefault(_ value: String) -> Bool { same(value, def) }
+
+    /// Two values of the setting are the same choice (a range compares as numbers: 1.50 is 1.5).
+    func same(_ a: String, _ b: String) -> Bool {
+        kind == "range" ? abs((Double(a) ?? .nan) - (Double(b) ?? .nan)) < 1e-6 : a == b
     }
 
     /// A value the game offers (a saved choice the game no longer offers is dropped).

@@ -44,6 +44,15 @@ final class OptionsModel: ObservableObject {
 
     var changed: Bool { game.options.contains { !$0.isDefault(value($0)) } }
 
+    /// The Preset row's value: the preset the choices match, else Default or Custom; nil when the game has no presets.
+    var preset: String? { game.presetName(values) }
+
+    /// Sets what the preset names (each kept at once, as a choice on its own is); a setting it does not name that another preset does goes to its default.
+    func choosePreset(_ name: String) {
+        for (setting, value) in game.presetValues(name) { set(setting, value) }
+        print("SwitchTV options: \(game.titleID) preset \(name)")
+    }
+
     func set(_ setting: GameSetting, _ value: String) {
         guard setting.accepts(value) else { return }
         values[setting.env] = value
@@ -71,6 +80,7 @@ struct OptionsView: View {
     init(game: CatalogGame, store: OptionsStore?) { _model = StateObject(wrappedValue: OptionsModel(game: game, store: store)) }
 
     private static let reset = "reset"
+    private static let preset = "preset"
     private var game: CatalogGame { model.game }
     private var focusedSetting: GameSetting? { game.options.first { $0.env == focused } }
 
@@ -84,6 +94,14 @@ struct OptionsView: View {
             HStack(alignment: .top, spacing: 70) {
                 about.frame(width: 560, alignment: .topLeading)
                 List {
+                    if let name = model.preset {
+                        Section {
+                            NavigationLink { PresetValues(model: model) } label: { OptionRow(label: "Preset", value: name, changed: name == "Custom") }
+                                .focused($focused, equals: Self.preset)
+                        } footer: {
+                            Text("Sets several options at once. Changing any of them afterwards shows Custom.")
+                        }
+                    }
                     ForEach(model.groups, id: \.title) { group in
                         Section {
                             ForEach(group.rows) { row($0) }
@@ -118,6 +136,13 @@ struct OptionsView: View {
                     Text(setting.label).font(.headline).foregroundStyle(Theme.textPrimary)
                     if let help = setting.help, !help.isEmpty { Text(help).font(.callout).foregroundStyle(Theme.textSecondary).fixedSize(horizontal: false, vertical: true) }
                     Text(defaultLine(setting)).font(.callout).foregroundStyle(Theme.textTertiary).fixedSize(horizontal: false, vertical: true)
+                }
+            } else if focused == Self.preset {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Preset").font(.headline).foregroundStyle(Theme.textPrimary)
+                    Text("Performance turns off the options that cost the most GPU time, for a smoother picture. Quality adds sharper textures. Balanced is the middle. Each sets only the options it names; the rest stay as they are.")
+                        .font(.callout).foregroundStyle(Theme.textSecondary).fixedSize(horizontal: false, vertical: true)
+                    Text("Changing any option afterwards shows Custom.").font(.callout).foregroundStyle(Theme.textTertiary)
                 }
             } else if focused == Self.reset {
                 Text("Sets every option back to the game\u{2019}s defaults, the ones it was tested with.").font(.callout).foregroundStyle(Theme.textSecondary)
@@ -193,6 +218,40 @@ private struct OptionValues: View {
                                 if model.value(setting) == value || (setting.kind == "range" && Double(model.value(setting)).map { abs($0 - (Double(value) ?? .nan)) < 1e-6 } == true) {
                                     Image(systemName: "checkmark")
                                 }
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .padding(.horizontal, Theme.pagePadding).padding(.top, 70)
+        }
+    }
+}
+
+/// The game's presets, the current one ticked; Select sets its options and goes back.
+private struct PresetValues: View {
+    @ObservedObject var model: OptionsModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack {
+            Theme.background.ignoresSafeArea()
+            HStack(alignment: .top, spacing: 70) {
+                VStack(alignment: .leading, spacing: 18) {
+                    Text("Preset").font(.title2.weight(.bold)).foregroundStyle(Theme.textPrimary)
+                    Text("Choosing one sets these options: \(model.game.presetSettings.map(\.label).joined(separator: ", ")). Other options are left alone.")
+                        .font(.callout).foregroundStyle(Theme.textSecondary).fixedSize(horizontal: false, vertical: true)
+                    Text("Now: \(model.preset ?? "")").font(.callout).foregroundStyle(Theme.textTertiary)
+                }
+                .frame(width: 560, alignment: .topLeading)
+                List {
+                    ForEach(model.game.presetList, id: \.name) { preset in
+                        Button { model.choosePreset(preset.name); dismiss() } label: {
+                            HStack {
+                                Text(preset.name)
+                                Spacer()
+                                if model.preset == preset.name { Image(systemName: "checkmark") }
                             }
                         }
                     }

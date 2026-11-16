@@ -4,7 +4,11 @@ What changes in each release, in plain terms. Releases are tagged `v<version>` a
 
 ## Unreleased
 
-Nothing yet.
+Version 0.3.0, not released yet.
+
+**Presets**
+- A **Preset** row at the top of a game's Options page: Performance, Balanced or Quality sets a group of the game's options in one choice. Change any of those options afterwards and the row reads Custom; with every one of them at its default it reads Default (or the preset equal to the defaults). Choosing a preset does not change a setting it does not name.
+- The presets come from the game app's settings list (`presets` in `dm/launcher.json`, from TVPort's `dm/games/presets.tsv`) and are written into the catalogue (`presets` in `catalog.json`); a game whose list has none has no Preset row. Values the Apple TV page does not have, or its row does not take, are left out.
 
 ## 0.2.0 (2026-11-15)
 

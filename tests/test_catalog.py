@@ -99,6 +99,49 @@ class OptionsTests(Fixture):
         self.assertNotEqual(sc.fingerprint(self.out), before)   # TVPort installs SwitchTV again when a game's settings change
 
 
+class PresetTests(Fixture):
+    """A game's presets (TVPort's dm/games/presets.tsv, through the game app's settings list) reach the catalogue for the Options page's Preset row: only values of rows the TV page has and
+    their rows take; a preset left with nothing is dropped, except Balanced"""
+    LIST = json.loads((ROOT / 'tests/fixtures/ocarina-launcher.json').read_text())['settings']
+    PRESETS = [{'name': 'Performance', 'values': {'DM_FOLIAGE': 'off', 'DM_GROUND_MIST': 'off', 'DM_MODEL_LOD': '4', 'DM_SHADOW_CASCADES': '1', 'DM_REFLECTION_INTERVAL': '8'}},
+               {'name': 'Balanced', 'values': {}},
+               {'name': 'Quality', 'values': {'DM_ANISO': '16'}}]
+
+    def test_presets_go_into_the_catalogue_and_change_the_fingerprint(self):
+        self.games[0]['settings'] = self.LIST
+        self.make()
+        before = sc.fingerprint(self.out)
+        self.games[0]['presets'] = self.PRESETS
+        kart = next(g for g in self.make()['games'] if g['titleID'] == KART)
+        self.assertEqual([p['name'] for p in kart['presets']], ['Performance', 'Balanced', 'Quality'])
+        self.assertEqual(kart['presets'][0]['values']['DM_FOLIAGE'], 'off')
+        self.assertNotEqual(sc.fingerprint(self.out), before)
+
+    def test_a_game_without_presets_has_an_empty_list(self):
+        self.assertTrue(all(g['presets'] == [] for g in self.make()['games']))
+
+    def test_values_the_page_cannot_take_are_dropped(self):
+        rows = sc.tv_settings(self.LIST)
+        shown = sc.tv_presets([{'name': 'Quality', 'values': {'DM_ANISO': '16', 'DM_ANISO_X': '1', 'DM_TV_OUTPUT': '2160', 'DM_FOLIAGE': 'maybe', 'DM_RES_SCALE': '1.5'}}], rows)
+        values = shown[0]['values'] if shown else {}
+        self.assertNotIn('DM_ANISO_X', values)      # a setting the game does not have
+        self.assertNotIn('DM_TV_OUTPUT', values)    # a setting the TV page leaves out
+        self.assertNotIn('DM_FOLIAGE', values)      # a value its row does not take
+        self.assertEqual(values.get('DM_ANISO'), '16')
+
+    def test_a_preset_with_nothing_left_is_dropped_but_not_balanced(self):
+        rows = sc.tv_settings(self.LIST)
+        shown = sc.tv_presets([{'name': 'Performance', 'values': {'DM_NOPE': 'off'}}, {'name': 'Balanced', 'values': {}}, {'name': 'Quality', 'values': {'DM_ANISO': '16'}}], rows)
+        self.assertEqual([p['name'] for p in shown], ['Balanced', 'Quality'])
+        self.assertEqual(sc.tv_presets([{'name': 'Balanced', 'values': {}}], rows), [])   # nothing named at all: no Preset row
+        self.assertEqual(sc.tv_presets(None, rows), [])
+
+    def test_range_values_follow_the_rows_limits(self):
+        rows = sc.tv_settings(self.LIST)
+        scale = next(r for r in rows if r['env'] == 'DM_RENDER_SCALE')
+        self.assertTrue(sc.accepts(scale, '0.75') and not sc.accepts(scale, '2.0') and not sc.accepts(scale, '0x1') and not sc.accepts(scale, 'fast'))
+
+
 class CatalogTests(Fixture):
     def test_games_are_sorted_by_title_id(self):
         self.assertEqual([g['titleID'] for g in self.make()['games']], [WONDER, KART])
