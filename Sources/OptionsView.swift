@@ -140,7 +140,7 @@ struct OptionsView: View {
             } else if focused == Self.preset {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Preset").font(.headline).foregroundStyle(Theme.textPrimary)
-                    Text("Performance turns off the options that cost the most GPU time, for a smoother picture. Quality adds sharper textures. Balanced is the middle. Each sets only the options it names; the rest stay as they are.")
+                    Text("Performance turns off the options that cost the most GPU time, for a smoother picture. Quality adds sharper textures. Balanced is the middle. All three set the same group of options; the others stay as they are.")
                         .font(.callout).foregroundStyle(Theme.textSecondary).fixedSize(horizontal: false, vertical: true)
                     Text("Changing any option afterwards shows Custom.").font(.callout).foregroundStyle(Theme.textTertiary)
                 }
